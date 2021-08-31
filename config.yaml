@@ -1,0 +1,59 @@
+- target:
+    name: mainnet-1
+    url: https://127.0.0.1:5005
+  root_height: 7601063
+
+- target:
+    name: mainnet-2
+    url: https://127.0.0.1:5005
+  root_height: 8742959
+
+- target:
+    name: mainnet-3
+    url: https://127.0.0.1:5005
+  root_height: 9737133
+
+- target:
+    name: mainnet-4
+    url: https://127.0.0.1:5005
+  root_height: 9992020
+
+- target:
+    name: mainnet-5
+    url: https://127.0.0.1:5005
+  root_height: 12020337
+
+- target:
+    name: mainnet-6
+    url: https://127.0.0.1:5005
+  root_height: 12609237
+
+- target:
+    name: mainnet-7
+    url: https://127.0.0.1:5005
+  root_height: 13404174
+
+- target:
+    name: mainnet-8
+    url: https://127.0.0.1:5005
+  root_height: 13950742
+
+- target:
+    name: mainnet-9
+    url: https://127.0.0.1:5005
+  root_height: 14892104
+
+- target:
+    name: mainnet-10
+    url: https://127.0.0.1:5005
+  root_height: 15791891
+
+- target:
+    name: mainnet-11
+    url: https://127.0.0.1:5005
+  root_height: 16755602
+
+- target:
+    name: mainnet-12
+    url: https://127.0.0.1:5005
+  root_height: 17544523
