@@ -1,6 +1,6 @@
 # Versioning
 
-This version `v0.23` is intended to run on `mainnet-15` and `devnet-32`.
+This version `v0.25 is intended to run on `mainnet-17` and `devnet-34`.
 
 # Flow Data Provisioning Service
 
