@@ -16,6 +16,7 @@ package cloud
 
 import (
 	"context"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -67,7 +68,7 @@ func TestGCPStreamer_OnBlockFinalized(t *testing.T) {
 		queue: queue,
 	}
 
-	streamer.OnBlockFinalized(blockID)
+	streamer.OnBlockFinalized(&model.Block{BlockID: blockID})
 
 	require.Equal(t, 1, queue.Len())
 	assert.Equal(t, queue.PopFront(), blockID)

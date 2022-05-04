@@ -325,21 +325,9 @@ func run() int {
 	var load mapper.Loader
 	load = loader.FromIndex(log, storage, indexDB)
 	if empty {
-		file, err := os.Open(flagCheckpoint)
-		if err != nil {
-			log.Error().Err(err).Msg("could not open checkpoint file")
-			return failure
-		}
-		defer file.Close()
-		load = loader.FromCheckpoint(file)
+		load = loader.FromCheckpoint(flagCheckpoint, log)
 	} else if flagCheckpoint != "" {
-		file, err := os.Open(flagCheckpoint)
-		if err != nil {
-			log.Error().Err(err).Msg("could not open checkpoint file")
-			return failure
-		}
-		defer file.Close()
-		initialize := loader.FromCheckpoint(file)
+		initialize := loader.FromCheckpoint(flagCheckpoint, log)
 		load = loader.FromIndex(log, storage, indexDB,
 			loader.WithInitializer(initialize),
 			loader.WithExclude(loader.ExcludeOutside(first, last)),

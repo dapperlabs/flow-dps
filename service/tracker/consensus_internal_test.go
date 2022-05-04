@@ -15,6 +15,7 @@
 package tracker
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -78,7 +79,7 @@ func TestConsensus_OnBlockFinalized(t *testing.T) {
 
 		cons := BaselineConsensus(t, WithDB(db))
 
-		cons.OnBlockFinalized(header.ID())
+		cons.OnBlockFinalized(&model.Block{BlockID: header.ID()})
 
 		assert.Equal(t, cons.last, header.Height)
 	})
@@ -91,7 +92,7 @@ func TestConsensus_OnBlockFinalized(t *testing.T) {
 
 		cons := BaselineConsensus(t, WithDB(db))
 
-		cons.OnBlockFinalized(header.ID())
+		cons.OnBlockFinalized(&model.Block{BlockID: header.ID()})
 
 		assert.NotEqual(t, cons.last, header.Height)
 	})

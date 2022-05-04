@@ -16,6 +16,7 @@ package tracker
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -62,18 +63,17 @@ func NewConsensus(log zerolog.Logger, db *badger.DB, hold RecordHolder) (*Consen
 
 // OnBlockFinalized is a callback that notifies the consensus tracker of a new
 // finalized block.
-func (c *Consensus) OnBlockFinalized(blockID flow.Identifier) {
-
+func (c *Consensus) OnBlockFinalized(block *model.Block) {
 	var header flow.Header
-	err := c.db.View(operation.RetrieveHeader(blockID, &header))
+	err := c.db.View(operation.RetrieveHeader(block.BlockID, &header))
 	if err != nil {
-		c.log.Error().Err(err).Hex("block", blockID[:]).Msg("could not get header")
+		c.log.Error().Err(err).Hex("block", block.BlockID[:]).Msg("could not get header")
 		return
 	}
 
 	c.last = header.Height
 
-	c.log.Debug().Hex("block", blockID[:]).Uint64("height", header.Height).Msg("block finalization processed")
+	c.log.Debug().Hex("block", block.BlockID[:]).Uint64("height", header.Height).Msg("block finalization processed")
 }
 
 // Root returns the root height from the underlying protocol state.

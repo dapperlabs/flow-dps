@@ -88,8 +88,6 @@ var (
 			GenericLedgerPath(2),
 			GenericLedgerPayload(2),
 			hash.DummyHash,
-			64,
-			64,
 		),
 		node.NewNode(
 			256,
@@ -98,17 +96,13 @@ var (
 			GenericLedgerPath(4),
 			GenericLedgerPayload(4),
 			hash.DummyHash,
-			64,
-			64,
 		),
 		GenericLedgerPath(5),
 		GenericLedgerPayload(5),
 		hash.DummyHash,
-		64,
-		64,
 	)
 
-	GenericTrie, _ = trie.NewMTrie(GenericRootNode)
+	GenericTrie, _ = trie.NewMTrie(GenericRootNode, 64, 64)
 
 	GenericAccount = flow.Account{
 		Address: GenericAddress(0),

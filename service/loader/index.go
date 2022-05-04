@@ -78,7 +78,7 @@ func (i *Index) Trie() (*trie.MTrie, error) {
 		for i, p := range payloads {
 			realPayloads[i] = *p
 		}
-		tree, err = trie.NewTrieWithUpdatedRegisters(tree, paths, realPayloads, false)
+		tree, _, err = trie.NewTrieWithUpdatedRegisters(tree, paths, realPayloads, false)
 		if err != nil {
 			return fmt.Errorf("could not update trie: %w", err)
 		}
