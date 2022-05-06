@@ -32,7 +32,7 @@ function bootstrap() {
     curl -o "$ROOT_PROTOCOL_STATE_SNAPSHOT_FILE" "$ROOT_PROTOCOL_STATE_SNAPSHOT_URL"
   fi
 
-  GCP_BUCKET=$(jq .stateArtefacts.gcp.executionStateBucket <<< "$SPORK_DATA")
+  GCP_BUCKET=$(jq -r .stateArtefacts.gcp.executionStateBucket <<< "$SPORK_DATA")
 
   # this selects random node from the list
   SEED_NODES_COUNT=$(jq -r .seedNodes\|length <<< "$SPORK_DATA")
