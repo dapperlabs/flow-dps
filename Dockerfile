@@ -4,7 +4,7 @@ RUN apt-get update
 RUN apt-get -y install cmake zip sudo git
 
 ENV FLOW_GO_REPO="https://github.com/onflow/flow-go"
-ENV FLOW_GO_BRANCH=v0.25.12
+ENV FLOW_GO_BRANCH=v0.25.14
 
 RUN mkdir /dps /docker /flow-go
 
@@ -20,6 +20,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build  \
     make -C /flow-go crypto/relic/build #prebuild crypto dependency
 
+RUN ls -la /flow-go/crypto/
+
 FROM build-setup AS build-binary
 
 ARG BINARY
@@ -27,7 +29,7 @@ ARG BINARY
 WORKDIR /dps
 RUN  --mount=type=cache,target=/go/pkg/mod \
      --mount=type=cache,target=/root/.cache/go-build  \
-     go build -o /app -tags relic -ldflags "-extldflags -static" ./cmd/$BINARY && \
+     GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -o /app --tags relic -ldflags "-extldflags -static" ./cmd/$BINARY && \
      chmod a+x /app
 
 
