@@ -15,6 +15,7 @@ bootstrap "testnet" 34 "$DATA_DIR"
 docker run \
   -v $DATA_DIR/:/data/ \
   -p 5005:5005 \
+  --name flow-dps \
   gcr.io/flow-container-registry/flow-dps-live:v0.25 \
   -a 0.0.0.0:5005 \
   -i /data/index \
