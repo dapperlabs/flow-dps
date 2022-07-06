@@ -1,6 +1,6 @@
 module github.com/onflow/flow-dps
 
-go 1.17
+go 1.18
 
 require (
 	cloud.google.com/go/storage v1.23.0
@@ -14,7 +14,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/klauspost/compress v1.15.1
-	github.com/labstack/echo/v4 v4.5.0
+	github.com/labstack/echo/v4 v4.7.2
 	github.com/onflow/cadence v0.24.3
 	github.com/onflow/flow-go v0.26.12
 	github.com/onflow/flow-go-sdk v0.26.2
@@ -26,7 +26,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/srikrsna/protoc-gen-gotag v0.6.1
 	github.com/stretchr/testify v1.7.1
-	github.com/ziflex/lecho/v2 v2.5.1
+	github.com/ziflex/lecho/v2 v2.5.2
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	google.golang.org/api v0.85.0
 	google.golang.org/grpc v1.47.0
@@ -137,7 +137,7 @@ require (
 	github.com/kevinburke/go-bindata v3.22.0+incompatible // indirect
 	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect
-	github.com/labstack/gommon v0.3.0 // indirect
+	github.com/labstack/gommon v0.3.1 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/libp2p/go-buffer-pool v0.0.2 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
