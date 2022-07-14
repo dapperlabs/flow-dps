@@ -20,7 +20,7 @@ import (
 
 // DefaultConfig is the default configuration for the Google Cloud Streamer.
 var DefaultConfig = Config{
-	BufferSize:    32,
+	BufferSize:    32000000,
 	CatchupBlocks: []flow.Identifier{},
 }
 
