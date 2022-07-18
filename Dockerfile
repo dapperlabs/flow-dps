@@ -1,7 +1,7 @@
 FROM golang:1.18-buster AS build-setup
 
-RUN apt-get update
-RUN apt-get -y install cmake zip sudo git
+RUN apt-get update \
+ && apt-get -y install cmake zip sudo git
 
 ENV FLOW_GO_REPO="https://github.com/onflow/flow-go"
 ENV FLOW_GO_BRANCH=v0.26.16
