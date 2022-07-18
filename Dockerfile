@@ -1,7 +1,7 @@
 FROM golang:1.18-buster AS build-setup
 
-RUN apt-get update
-RUN apt-get -y install cmake zip sudo git
+RUN apt-get update \
+ && apt-get -y install cmake zip sudo git
 
 ENV FLOW_GO_REPO="https://github.com/onflow/flow-go"
 ENV FLOW_GO_BRANCH=v0.26.16
@@ -11,7 +11,7 @@ RUN mkdir /dps /docker /flow-go
 WORKDIR /dps
 
 # clone repos
-ADD . /dps
+COPY . /dps
 RUN git clone --branch $FLOW_GO_BRANCH $FLOW_GO_REPO /flow-go
 
 RUN ln -s /flow-go /dps/flow-go
