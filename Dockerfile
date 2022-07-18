@@ -11,7 +11,7 @@ RUN mkdir /dps /docker /flow-go
 WORKDIR /dps
 
 # clone repos
-ADD . /dps
+COPY . /dps
 RUN git clone --branch $FLOW_GO_BRANCH $FLOW_GO_REPO /flow-go
 
 RUN ln -s /flow-go /dps/flow-go
