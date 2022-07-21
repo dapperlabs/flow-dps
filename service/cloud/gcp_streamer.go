@@ -18,9 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"io"
+	"math"
 	"sync/atomic"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 
 	"cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
@@ -57,6 +59,7 @@ func NewGCPStreamer(log zerolog.Logger, bucket *storage.BucketHandle, options ..
 
 	decOptions := cbor.DecOptions{
 		ExtraReturnErrors: cbor.ExtraDecErrorUnknownField,
+		MaxArrayElements:  math.MaxUint32,
 	}
 	decoder, err := decOptions.DecMode()
 	if err != nil {

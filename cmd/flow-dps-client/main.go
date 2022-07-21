@@ -51,12 +51,13 @@ func run() int {
 
 	// Command line parameter initialization.
 	var (
-		flagAPI    string
-		flagCache  uint64
-		flagHeight uint64
-		flagLevel  string
-		flagParams string
-		flagScript string
+		flagAPI        string
+		flagCache      uint64
+		flagHeight     uint64
+		flagLevel      string
+		flagParams     string
+		flagScript     string
+		flagDebugIndex bool
 	)
 
 	pflag.StringVarP(&flagAPI, "api", "a", "", "host for GRPC API server")
@@ -65,7 +66,7 @@ func run() int {
 	pflag.StringVarP(&flagLevel, "level", "l", "info", "log output level")
 	pflag.StringVarP(&flagParams, "params", "p", "", "comma-separated list of Cadence parameters")
 	pflag.StringVarP(&flagScript, "script", "s", "script.cdc", "path to file with Cadence script")
-
+	pflag.BoolVarP(&flagDebugIndex, "debug-index", "d", false, "display index information")
 	pflag.Parse()
 
 	// Logger initialization.
@@ -101,6 +102,28 @@ func run() int {
 	}
 	defer conn.Close()
 
+	// Initialize codec.
+	codec := zbor.NewCodec()
+
+	// Execute the script using remote lookup and read.
+	client := dps.NewAPIClient(conn)
+
+	index := dps.IndexFromAPI(client, codec)
+
+	if flagDebugIndex {
+		first, err := index.First()
+		if err != nil {
+			log.Error().Err(err).Msg("could not get index debug data")
+			return failure
+		}
+		last, err := index.Last()
+		if err != nil {
+			log.Error().Err(err).Msg("could not get index debug data")
+			return failure
+		}
+		fmt.Printf("Index first: %d\nIndex last:  %d\n", first, last)
+	}
+
 	// Read the script.
 	script, err := os.ReadFile(flagScript)
 	if err != nil {
@@ -122,12 +145,7 @@ func run() int {
 		}
 	}
 
-	// Initialize codec.
-	codec := zbor.NewCodec()
-
-	// Execute the script using remote lookup and read.
-	client := dps.NewAPIClient(conn)
-	invoke, err := invoker.New(dps.IndexFromAPI(client, codec), invoker.WithCacheSize(flagCache))
+	invoke, err := invoker.New(index, invoker.WithCacheSize(flagCache))
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize invoker")
 		return failure
