@@ -1,10 +1,8 @@
 package datasync
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"sync/atomic"
 
@@ -31,8 +29,8 @@ type ExecDataSync struct {
 	busy       uint32         // used as a guard to avoid concurrent polling
 }
 
-// NewGCPStreamer returns a new GCP Streamer using the given bucket and options.
-func NewExecDataSync(log zerolog.Logger, accessNode string) *ExecDataSync {
+// NewExecDataSync returns a new Exec data sync object using the given AN client and options.
+func NewExecDataSync(log zerolog.Logger, accessNode string, options ...Option) *ExecDataSync {
 
 	cfg := DefaultConfig
 	for _, option := range options {
@@ -48,8 +46,8 @@ func NewExecDataSync(log zerolog.Logger, accessNode string) *ExecDataSync {
 		panic(err)
 	}
 
-	g := GCPStreamer{
-		log:        log.With().Str("component", "gcp_streamer").Logger(),
+	e := ExecDataSync{
+		log:        log.With().Str("component", "exec_data_sync").Logger(),
 		decoder:    decoder,
 		accessNode: accessNode,
 		queue:      dps.NewDeque(),
@@ -59,11 +57,11 @@ func NewExecDataSync(log zerolog.Logger, accessNode string) *ExecDataSync {
 	}
 
 	for _, blockID := range cfg.CatchupBlocks {
-		g.queue.PushFront(blockID)
-		g.log.Debug().Hex("block", blockID[:]).Msg("execution record queued for catch-up")
+		e.queue.PushFront(blockID)
+		e.log.Debug().Hex("block", blockID[:]).Msg("execution record queued for catch-up")
 	}
 
-	return &g
+	return &e
 }
 
 // OnBlockFinalized is a callback for the Flow consensus follower. It is called
@@ -103,7 +101,7 @@ func (e *ExecDataSync) Next() (*uploader.BlockData, error) {
 	return record.(*uploader.BlockData), nil
 }
 
-func (g *GCPStreamer) poll() {
+func (e *ExecDataSync) poll() {
 
 	// We only call `Next()` sequentially, so there is no need to guard it from
 	// concurrent access. However, when the buffer is not empty, we might still
@@ -112,32 +110,30 @@ func (g *GCPStreamer) poll() {
 	// do this with a simple flag that is set atomically to work like a
 	// `TryLock()` on a mutex, which is unfortunately not available in Go, see:
 	// https://github.com/golang/go/issues/6123
-	if !atomic.CompareAndSwapUint32(&g.busy, 0, 1) {
+	if !atomic.CompareAndSwapUint32(&e.busy, 0, 1) {
 		return
 	}
-	defer atomic.StoreUint32(&g.busy, 0)
+	defer atomic.StoreUint32(&e.busy, 0)
 
 	// At this point, we try to pull new files from the cloud.
-	err := g.download()
+	err := e.getExecData()
 	if errors.Is(err, storage.ErrObjectNotExist) {
-		g.log.Debug().Msg("next execution record not available, download stopped")
+		e.log.Debug().Msg("next execution record not available, download stopped")
 		return
 	}
 	if err != nil {
-		g.log.Error().Err(err).Msg("could not download execution records")
+		e.log.Error().Err(err).Msg("could not download execution records")
 		return
 	}
 }
 
-func (g *GCPStreamer) download() error {
+func (e *ExecDataSync) getExecData() error {
 
 	for {
 
-		// We only want to retrieve and process files until the buffer is full. We
-		// do not need to have a big buffer; we just want to avoid HTTP request
-		// latency when the execution follower wants a block record.
-		if uint(g.buffer.Len()) >= g.limit {
-			g.log.Debug().Uint("limit", g.limit).Msg("buffer full, stopping execution record download")
+		// We only want to retrieve and process execData blocks until the buffer is full.
+		if uint(e.buffer.Len()) >= e.limit {
+			e.log.Debug().Uint("limit", e.limit).Msg("buffer full, stopping execution record pull")
 			return nil
 		}
 
@@ -147,61 +143,28 @@ func (g *GCPStreamer) download() error {
 		// finalized, even if the data is available before. However, it seems to
 		// be the only way to make sure trie updates are delivered to the mapper
 		// in the right order without changing the way uploads work.
-		if uint(g.queue.Len()) == 0 {
-			g.log.Debug().Msg("queue empty, stopping execution record download")
+		if uint(e.queue.Len()) == 0 {
+			e.log.Debug().Msg("queue empty, stopping execution record download")
 			return nil
 		}
 
-		// Get the name of the file based on the block ID. The file name is
-		// made up of the block ID in hex and a `.cbor` extension, see:
-		// Maks: "thats correct. In fact the full name is `<blockID>.cbor`"
-		// If we encounter an error, such as that the file is not found, we put
-		// the block ID back into the queue and return `nil` to stop pulling.
-		blockID := g.queue.PopBack().(flow.Identifier)
-		name := blockID.String() + ".cbor"
-		record, err := g.pullRecord(name)
+		// Get the name of the file based on the block ID. The file n
+		blockID := e.queue.PopBack().(flow.Identifier)
+		record, err := e.pullData(blockID)
 		if err != nil {
-			g.queue.PushBack(blockID)
-			return fmt.Errorf("could not pull execution record (name: %s): %w", name, err)
+			e.queue.PushBack(blockID)
+			return fmt.Errorf("could not pull execution record (name: %s): %w", blockID, err)
 		}
 
-		g.log.Debug().
-			Str("name", name).
+		e.log.Debug().
+			Hex("blockID", blockID[:]).
 			Uint64("height", record.Block.Header.Height).
-			Hex("block", blockID[:]).
 			Msg("pushing execution record into buffer")
 
-		g.buffer.PushFront(record)
+		e.buffer.PushFront(record)
 	}
 }
 
-func (g *GCPStreamer) pullRecord(name string) (*uploader.BlockData, error) {
+func (e *ExecDataSync) pullData(blockID flow.Identifier) (*uploader.BlockData, error) {
 
-	object := g.bucket.Object(name)
-	reader, err := object.NewReader(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("could not create object reader: %w", err)
-	}
-	defer reader.Close()
-
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not read execution record: %w", err)
-	}
-
-	var record uploader.BlockData
-	err = g.decoder.Unmarshal(data, &record)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode execution record: %w", err)
-	}
-
-	if record.FinalStateCommitment == flow.DummyStateCommitment {
-		return nil, fmt.Errorf("execution record contains empty state commitment")
-	}
-
-	if record.Block.Header.Height == 0 {
-		return nil, fmt.Errorf("execution record contains empty block data")
-	}
-
-	return &record, nil
 }

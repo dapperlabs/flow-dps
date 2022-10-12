@@ -67,6 +67,10 @@ var (
 		Timestamp: time.Date(1972, 11, 12, 13, 14, 15, 16, time.UTC),
 	}
 
+	GenericBlock = &flow.Block{
+		Header: GenericHeader,
+	}
+
 	GenericLedgerKey = ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(0, []byte(`owner`)),
 		ledger.NewKeyPart(1, []byte(`controller`)),

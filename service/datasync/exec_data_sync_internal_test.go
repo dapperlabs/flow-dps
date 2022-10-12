@@ -34,7 +34,6 @@ func TestNewExecDataSync(t *testing.T) {
 
 	require.NotNil(t, streamer)
 	assert.NotZero(t, streamer.log)
-	assert.Equal(t, bucket, streamer.bucket)
 	assert.Equal(t, limit, streamer.limit)
 	assert.NotNil(t, streamer.queue)
 	assert.NotNil(t, streamer.buffer)
@@ -45,18 +44,18 @@ func TestNewExecDataSync(t *testing.T) {
 }
 
 func TestGCPStreamer_OnBlockFinalized(t *testing.T) {
-	blockID := mocks.GenericHeader.ID()
+	block := mocks.GenericBlock
 	queue := dps.NewDeque()
 
-	streamer := &NewExecDataSync{
+	streamer := &ExecDataSync{
 		log:   zerolog.Nop(),
 		queue: queue,
 	}
 
-	streamer.OnBlockFinalized(blockID)
+	streamer.OnBlockFinalized(block)
 
 	require.Equal(t, 1, queue.Len())
-	assert.Equal(t, queue.PopFront(), blockID)
+	assert.Equal(t, queue.PopFront(), block.ID())
 }
 
 func TestGCPStreamer_Next(t *testing.T) {
@@ -69,21 +68,11 @@ func TestGCPStreamer_Next(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("returns available record if buffer not empty", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-			rw.WriteHeader(http.StatusOK)
-		}))
 
-		client, err := gcloud.NewClient(
-			context.Background(),
-			option.WithoutAuthentication(),
-			option.WithEndpoint(server.URL),
-		)
 		require.NoError(t, err)
-		bucket := client.Bucket("test")
 
-		streamer := &NewExecDataSync{
+		streamer := &ExecDataSync{
 			log:     zerolog.Nop(),
-			bucket:  bucket,
 			decoder: decoder,
 			queue:   dps.NewDeque(),
 			buffer:  dps.NewDeque(),
@@ -127,23 +116,8 @@ func TestGCPStreamer_Next(t *testing.T) {
 	})
 
 	t.Run("downloads records from queue when they are available", func(t *testing.T) {
-		serverCalled := make(chan struct{})
-		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-			_, _ = rw.Write(data)
-			serverCalled <- struct{}{}
-		}))
-
-		client, err := gcloud.NewClient(
-			context.Background(),
-			option.WithoutAuthentication(),
-			option.WithEndpoint(server.URL),
-		)
-		require.NoError(t, err)
-		bucket := client.Bucket("test")
-
-		streamer := &NewExecDataSync{
+		streamer := &ExecDataSync{
 			log:     zerolog.Nop(),
-			bucket:  bucket,
 			decoder: decoder,
 			queue:   dps.NewDeque(),
 			buffer:  dps.NewDeque(),
