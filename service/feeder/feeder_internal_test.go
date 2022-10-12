@@ -15,13 +15,14 @@
 package feeder
 
 import (
+	"encoding/binary"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 
 	"github.com/onflow/flow-dps/models/dps"
@@ -38,7 +39,7 @@ func TestFromWAL(t *testing.T) {
 
 func TestFeeder_Update(t *testing.T) {
 	update := mocks.GenericTrieUpdate(0)
-	data := encoding.EncodeTrieUpdate(update)
+	data := ledger.EncodeTrieUpdate(update)
 
 	t.Run("nominal case", func(t *testing.T) {
 		t.Parallel()
@@ -51,7 +52,12 @@ func TestFeeder_Update(t *testing.T) {
 			// On the first call, return a Delete operation which should get ignored and skipped.
 			if !recordCalled {
 				recordCalled = true
+				size := len(update.RootHash)
+				buffer := make([]byte, 2)
+				binary.BigEndian.PutUint16(buffer, uint16(size))
+
 				_ = builder.WriteByte(byte(wal.WALDelete))
+				_, _ = builder.Write(buffer)
 				_, _ = builder.Write(update.RootHash[:])
 
 				return []byte(builder.String())
