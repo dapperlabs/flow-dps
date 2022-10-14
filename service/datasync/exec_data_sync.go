@@ -166,5 +166,6 @@ func (e *ExecDataSync) getExecData() error {
 }
 
 func (e *ExecDataSync) pullData(blockID flow.Identifier) (*uploader.BlockData, error) {
-
+	// query AN from cached connection
+	return &uploader.BlockData{}, nil
 }

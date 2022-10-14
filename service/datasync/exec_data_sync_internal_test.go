@@ -1,33 +1,26 @@
 package datasync
 
 import (
-	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/storage"
-	gcloud "cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/flow-dps/models/dps"
+	"github.com/onflow/flow-dps/testing/mocks"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/api/option"
-
-	"github.com/onflow/flow-dps/models/dps"
-	"github.com/onflow/flow-dps/testing/mocks"
 )
 
 func TestNewExecDataSync(t *testing.T) {
 	log := zerolog.Nop()
-	bucket := &storage.BucketHandle{}
+	accessNode := "mock.access-node.url"
 	limit := uint(42)
 	blockIDs := mocks.GenericBlockIDs(4)
 
 	streamer := NewExecDataSync(
 		log,
-		bucket,
+		accessNode,
 		WithBufferSize(limit),
 		WithCatchupBlocks(blockIDs),
 	)
@@ -55,12 +48,12 @@ func TestGCPStreamer_OnBlockFinalized(t *testing.T) {
 	streamer.OnBlockFinalized(block)
 
 	require.Equal(t, 1, queue.Len())
-	assert.Equal(t, queue.PopFront(), block.ID())
+	assert.Equal(t, queue.PopFront(), block.BlockID)
 }
 
 func TestGCPStreamer_Next(t *testing.T) {
 	record := mocks.GenericRecord()
-	data, err := cbor.Marshal(record)
+	_, err := cbor.Marshal(record)
 	require.NoError(t, err)
 
 	decOptions := cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}
@@ -88,21 +81,8 @@ func TestGCPStreamer_Next(t *testing.T) {
 	})
 
 	t.Run("returns unavailable when no block data in buffer", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-			rw.WriteHeader(http.StatusOK)
-		}))
-
-		client, err := gcloud.NewClient(
-			context.Background(),
-			option.WithoutAuthentication(),
-			option.WithEndpoint(server.URL),
-		)
-		require.NoError(t, err)
-		bucket := client.Bucket("test")
-
-		streamer := &NewExecDataSync{
+		streamer := &ExecDataSync{
 			log:     zerolog.Nop(),
-			bucket:  bucket,
 			decoder: decoder,
 			queue:   dps.NewDeque(),
 			buffer:  dps.NewDeque(),
@@ -115,7 +95,7 @@ func TestGCPStreamer_Next(t *testing.T) {
 		assert.ErrorIs(t, err, dps.ErrUnavailable)
 	})
 
-	t.Run("downloads records from queue when they are available", func(t *testing.T) {
+	t.Run("gets exec data from queue if it is available", func(t *testing.T) {
 		streamer := &ExecDataSync{
 			log:     zerolog.Nop(),
 			decoder: decoder,
@@ -134,9 +114,6 @@ func TestGCPStreamer_Next(t *testing.T) {
 		select {
 		case <-time.After(100 * time.Millisecond):
 			t.Fatal("GCP Streamer did not attempt to download record from bucket")
-		case <-serverCalled:
 		}
-
-		assert.Zero(t, streamer.queue.Len())
 	})
 }
