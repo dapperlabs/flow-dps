@@ -289,10 +289,13 @@ func run() int {
 		cloud.WithCatchupBlocks(blockIDs),
 	)
 
+	// dataSync :=  datasync.NewExecDataSync(log, flagSeedAddress, datasync.WithCatchupBlocks(blockIDs))
+
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
 	// follower and related consensus data on one side, and the cloud streamer
 	// and available execution records on the other side.
+	// execution, err := tracker.NewExecution(log, protocolDB, dataSync)
 	execution, err := tracker.NewExecution(log, protocolDB, stream)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize execution tracker")
@@ -311,6 +314,7 @@ func run() int {
 	// for finalized blocks.
 	follow.AddOnBlockFinalizedConsumer(stream.OnBlockFinalized)
 	follow.AddOnBlockFinalizedConsumer(consensus.OnBlockFinalized)
+	// follow.AddOnBlockFinalizedConsumer(dataSync.OnBlockFinalized)
 
 	// If we have an empty database, we want a loader to bootstrap from the
 	// checkpoint; if we don't, we can optionally use the root checkpoint to
