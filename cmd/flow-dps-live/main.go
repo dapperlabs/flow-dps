@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"github.com/onflow/flow-dps/service/datasync"
 	"net"
 	"net/http"
 	"os"
@@ -46,7 +47,6 @@ import (
 	api "github.com/onflow/flow-dps/api/dps"
 	"github.com/onflow/flow-dps/codec/zbor"
 	"github.com/onflow/flow-dps/models/dps"
-	"github.com/onflow/flow-dps/service/cloud"
 	"github.com/onflow/flow-dps/service/forest"
 	"github.com/onflow/flow-dps/service/index"
 	"github.com/onflow/flow-dps/service/initializer"
@@ -284,19 +284,14 @@ func run() int {
 			log.Error().Err(err).Msg("could not close GCP client")
 		}
 	}()
-	bucket := client.Bucket(flagBucket)
-	stream := cloud.NewGCPStreamer(log, bucket,
-		cloud.WithCatchupBlocks(blockIDs),
-	)
 
-	// dataSync :=  datasync.NewExecDataSync(log, flagSeedAddress, datasync.WithCatchupBlocks(blockIDs))
+	dataSync := datasync.NewExecDataSync(log, flagSeedAddress, datasync.WithCatchupBlocks(blockIDs))
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
 	// follower and related consensus data on one side, and the cloud streamer
-	// and available execution records on the other side.
-	// execution, err := tracker.NewExecution(log, protocolDB, dataSync)
-	execution, err := tracker.NewExecution(log, protocolDB, stream)
+	// and available execution records on the other side
+	execution, err := tracker.NewExecution(log, protocolDB, dataSync)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize execution tracker")
 		return failure
@@ -312,9 +307,8 @@ func run() int {
 	// will use the callback to make additional data available to the mapper,
 	// while the cloud streamer will use the callback to download execution data
 	// for finalized blocks.
-	follow.AddOnBlockFinalizedConsumer(stream.OnBlockFinalized)
 	follow.AddOnBlockFinalizedConsumer(consensus.OnBlockFinalized)
-	// follow.AddOnBlockFinalizedConsumer(dataSync.OnBlockFinalized)
+	follow.AddOnBlockFinalizedConsumer(dataSync.OnBlockFinalized)
 
 	// If we have an empty database, we want a loader to bootstrap from the
 	// checkpoint; if we don't, we can optionally use the root checkpoint to
