@@ -40,6 +40,6 @@ ARG BINARY
 
 COPY --from=build-binary /app /app
 
-EXPOSE 5005
+EXPOSE 5005 6060
 
 ENTRYPOINT ["/app"]
