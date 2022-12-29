@@ -1,32 +1,32 @@
 package datasync
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"math"
 	"sync/atomic"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-
 	"cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/onflow/flow-dps/models/dps"
+	"github.com/onflow/flow-archive/models/archive"
 )
 
 // ExecDataSync is a component to retrieve execution data from a trusted access node API instead of the GCPStreamer
 type ExecDataSync struct {
-	log        zerolog.Logger
-	decoder    cbor.DecMode
-	accessNode string
-	queue      *dps.SafeDeque // queue of block identifiers for next downloads
-	buffer     *dps.SafeDeque // queue of downloaded execution data records
-	limit      uint           // buffer size limit for downloaded records
-	busy       uint32         // used as a guard to avoid concurrent polling
+	decoder  cbor.DecMode
+	execData execData.ExecutionDataAPIClient
+	queue    *archive.SafeDeque // queue of block identifiers for next downloads
+	buffer   *archive.SafeDeque // queue of downloaded execution data records
+	limit    uint               // buffer size limit for downloaded records
+	busy     uint32             // used as a guard to avoid concurrent polling
 }
 
 // NewExecDataSync returns a new Exec data sync object using the given AN client and options.
@@ -50,8 +50,8 @@ func NewExecDataSync(log zerolog.Logger, accessNode string, options ...Option) *
 		log:        log.With().Str("component", "exec_data_sync").Logger(),
 		decoder:    decoder,
 		accessNode: accessNode,
-		queue:      dps.NewDeque(),
-		buffer:     dps.NewDeque(),
+		queue:      archive.NewDeque(),
+		buffer:     archive.NewDeque(),
 		limit:      cfg.BufferSize,
 		busy:       0,
 	}
@@ -165,7 +165,17 @@ func (e *ExecDataSync) getExecData() error {
 	}
 }
 
-func (e *ExecDataSync) pullData(blockID flow.Identifier) (*uploader.BlockData, error) {
+func (e *ExecDataSync) pullData(ctx context.Context, blockID flow.Identifier) (*uploader.BlockData, error) {
 	// query AN from cached connection
-	return &uploader.BlockData{}, nil
+	req := &execData.GetExecutionDataByBlockIDRequest{BlockId: blockID[:]}
+	res, err := e.execData.GetExecutionDataByBlockID(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return convertToBlockData(res.BlockExecutionData)
+}
+
+func convertToBlockData(data *entities.BlockExecutionData) (*uploader.BlockData, error) {
+	// TODO: implement
+	return nil, nil
 }

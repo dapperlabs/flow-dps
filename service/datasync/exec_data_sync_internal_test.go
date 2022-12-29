@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/flow-dps/models/dps"
-	"github.com/onflow/flow-dps/testing/mocks"
+	"github.com/onflow/flow-archive/models/archive"
+	"github.com/onflow/flow-archive/testing/mocks"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,8 +67,8 @@ func TestGCPStreamer_Next(t *testing.T) {
 		streamer := &ExecDataSync{
 			log:     zerolog.Nop(),
 			decoder: decoder,
-			queue:   dps.NewDeque(),
-			buffer:  dps.NewDeque(),
+			queue:   archive.NewDeque(),
+			buffer:  archive.NewDeque(),
 			limit:   999,
 		}
 
