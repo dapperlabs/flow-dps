@@ -46,8 +46,8 @@ jobs:
       - name: Install Protobuf compiler
         run: |
           PB_REL="https://github.com/protocolbuffers/protobuf/releases"
-          curl -LO $PB_REL/download/v3.19.4/protoc-3.19.4-linux-x86_64.zip
-          unzip protoc-3.19.4-linux-x86_64.zip -d $HOME/.local
+          curl -LO $PB_REL/download/v21.8/protoc-21.8-linux-x86_64.zip
+          unzip protoc-21.8-linux-x86_64.zip -d $HOME/.local
           export PATH="$PATH:$HOME/.local/bin"
           git clean -fd
 
@@ -104,3 +104,35 @@ jobs:
       # that they pass successfully.
       - name: Verify integration tests
         run: go test -v -tags="relic integration" ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          args: -v --build-tags relic --timeout=3m
+          working-directory: .
+          skip-pkg-cache: true
+
+  docker-verify:
+    name: verify docker build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+
+      - name: Cache Go modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Docker build
+        run: make docker-build-flow-archive

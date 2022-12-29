@@ -32,7 +32,6 @@ type Server struct {
 func NewServer(log zerolog.Logger, address string) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/debug/pprof/", http.DefaultServeMux)
 
 	m := Server{
 		server: &http.Server{

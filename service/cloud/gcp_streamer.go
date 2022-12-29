@@ -18,11 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"math"
-	"sync/atomic"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"io"
+	"sync/atomic"
 
 	"cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
@@ -31,7 +29,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/flow-dps/models/dps"
+	"github.com/onflow/flow-archive/models/archive"
 )
 
 // GCPStreamer is a component that downloads block data from a Google Cloud bucket.
@@ -43,10 +41,10 @@ type GCPStreamer struct {
 	log     zerolog.Logger
 	decoder cbor.DecMode
 	bucket  *storage.BucketHandle
-	queue   *dps.SafeDeque // queue of block identifiers for next downloads
-	buffer  *dps.SafeDeque // queue of downloaded execution data records
-	limit   uint           // buffer size limit for downloaded records
-	busy    uint32         // used as a guard to avoid concurrent polling
+	queue   *archive.SafeDeque // queue of block identifiers for next downloads
+	buffer  *archive.SafeDeque // queue of downloaded execution data records
+	limit   uint               // buffer size limit for downloaded records
+	busy    uint32             // used as a guard to avoid concurrent polling
 }
 
 // NewGCPStreamer returns a new GCP Streamer using the given bucket and options.
@@ -56,10 +54,9 @@ func NewGCPStreamer(log zerolog.Logger, bucket *storage.BucketHandle, options ..
 	for _, option := range options {
 		option(&cfg)
 	}
-
 	decOptions := cbor.DecOptions{
 		ExtraReturnErrors: cbor.ExtraDecErrorUnknownField,
-		MaxArrayElements:  math.MaxUint32,
+		MaxArrayElements:  cborMaxArrayElements,
 	}
 	decoder, err := decOptions.DecMode()
 	if err != nil {
@@ -70,8 +67,8 @@ func NewGCPStreamer(log zerolog.Logger, bucket *storage.BucketHandle, options ..
 		log:     log.With().Str("component", "gcp_streamer").Logger(),
 		decoder: decoder,
 		bucket:  bucket,
-		queue:   dps.NewDeque(),
-		buffer:  dps.NewDeque(),
+		queue:   archive.NewDeque(),
+		buffer:  archive.NewDeque(),
 		limit:   cfg.BufferSize,
 		busy:    0,
 	}
@@ -111,7 +108,7 @@ func (g *GCPStreamer) Next() (*uploader.BlockData, error) {
 	// later.
 	if g.buffer.Len() == 0 {
 		g.log.Debug().Msg("buffer empty, no execution record available")
-		return nil, dps.ErrUnavailable
+		return nil, archive.ErrUnavailable
 	}
 
 	// If we have a record in the buffer, we will just return it. The buffer is
