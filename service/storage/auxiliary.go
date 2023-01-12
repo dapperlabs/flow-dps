@@ -72,14 +72,14 @@ func (l *Library) retrieve(key []byte, v interface{}) func(tx *badger.Txn) error
 	}
 }
 
-func (l *Library) save(key []byte, value interface{}) func(*badger.Txn) error {
+func (l *Library) save(key []byte, value interface{}) func(txn *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		val, err := l.codec.Marshal(value)
 		if err != nil {
 			return fmt.Errorf("could not encode value (key: %x): %w", key, err)
 		}
 
-		err = tx.Set(key, val)
+		err = (key, val)
 		if err != nil {
 			return fmt.Errorf("could not set value (key: %x): %w", key, err)
 		}

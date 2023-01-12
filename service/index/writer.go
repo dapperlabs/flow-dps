@@ -38,7 +38,7 @@ type Writer struct {
 	db   *badger.DB
 	lib  archive.WriteLibrary
 	cfg  Config
-	tx   *badger.Txn
+	tx   *badger.DB.New
 	sema *semaphore.Weighted
 	err  chan error
 
@@ -60,7 +60,7 @@ func NewWriter(db *badger.DB, lib archive.WriteLibrary, options ...func(*Config)
 		db:   db,
 		lib:  lib,
 		cfg:  cfg,
-		tx:   db.N(true),
+		tx:   &badger.Txn{},
 		sema: semaphore.NewWeighted(int64(cfg.ConcurrentTransactions)),
 		err:  make(chan error, cfg.ConcurrentTransactions),
 
