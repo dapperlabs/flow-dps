@@ -20,7 +20,7 @@ import (
 	"math"
 
 	"github.com/OneOfOne/xxhash"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/outcaste-io/badger/v4"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"

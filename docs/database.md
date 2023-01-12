@@ -1,6 +1,6 @@
 ## Index Schema
 
-The DPS uses [BadgerDB](https://github.com/dgraph-io/badger) to store datasets of state changes and block information to build all the indexes required for random protocol and execution state access.
+The Archive node uses [BadgerDB](https://github.com/outcaste-io/badger) to store datasets of state changes and block information to build all the indexes required for random protocol and execution state access.
 
 #### First Height
 

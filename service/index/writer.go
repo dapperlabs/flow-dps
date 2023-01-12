@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/outcaste-io/badger/v4"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/onflow/flow-go/ledger"
@@ -60,7 +60,7 @@ func NewWriter(db *badger.DB, lib archive.WriteLibrary, options ...func(*Config)
 		db:   db,
 		lib:  lib,
 		cfg:  cfg,
-		tx:   db.NewTransaction(true),
+		tx:   db.N(true),
 		sema: semaphore.NewWeighted(int64(cfg.ConcurrentTransactions)),
 		err:  make(chan error, cfg.ConcurrentTransactions),
 

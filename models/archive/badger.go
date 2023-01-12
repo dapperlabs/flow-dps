@@ -15,8 +15,8 @@
 package archive
 
 import (
-	"github.com/dgraph-io/badger/v2"
-	"github.com/dgraph-io/badger/v2/options"
+	"github.com/outcaste-io/badger/v4"
+	"github.com/outcaste-io/badger/v4/options"
 )
 
 // DefaultOptions returns the default Badger options preferred by the DPS for its index database.

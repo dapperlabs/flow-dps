@@ -17,8 +17,8 @@ package storage
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/outcaste-io/badger/v4"
 )
 
 // Fallback goes through the provided operations until one of them succeeds.

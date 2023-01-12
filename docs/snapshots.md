@@ -14,8 +14,8 @@ Index snapshots are images of the DPS index database.
 These images can be used to easily transfer DPS index snapshots as a single file or to archive them in a more space-efficient manner.
 They can also be used in testing, so that tests have actual blocks, accounts, transactions and other information to operate on.
 
-At a low level, snapshots are created using the [badger](https://github.com/dgraph-io/badger) backup functionality.
-Technical documentation can be found [here](https://pkg.go.dev/github.com/dgraph-io/badger/v2#DB.Backup).
+At a low level, snapshots are created using the [badger](https://github.com/outcaste-io/badger) backup functionality.
+Technical documentation can be found [here](https://dgraph.io/docs/badger/).
 
 ## Creating a Snapshot
 

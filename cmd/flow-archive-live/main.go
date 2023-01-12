@@ -28,10 +28,10 @@ import (
 	"time"
 
 	gcloud "cloud.google.com/go/storage"
-	"github.com/dgraph-io/badger/v2"
 	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
+	"github.com/outcaste-io/badger/v4"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/api/option"

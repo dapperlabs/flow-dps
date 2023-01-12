@@ -20,7 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/outcaste-io/badger/v4"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-archive/models/archive"
