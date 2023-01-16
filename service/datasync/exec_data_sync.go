@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"github.com/optakt/flow-dps/models/dps"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 	"math"
 	"sync/atomic"
 
@@ -21,16 +23,17 @@ import (
 
 // ExecDataSync is a component to retrieve execution data from a trusted access node API instead of the GCPStreamer
 type ExecDataSync struct {
-	decoder  cbor.DecMode
-	execData execData.ExecutionDataAPIClient
-	queue    *archive.SafeDeque // queue of block identifiers for next downloads
-	buffer   *archive.SafeDeque // queue of downloaded execution data records
-	limit    uint               // buffer size limit for downloaded records
-	busy     uint32             // used as a guard to avoid concurrent polling
+	log         zerolog.Logger
+	decoder     cbor.DecMode
+	execDataApi execData.ExecutionDataAPIClient
+	queue       *archive.SafeDeque // queue of block identifiers for next downloads
+	buffer      *archive.SafeDeque // queue of downloaded execution data records
+	limit       uint               // buffer size limit for downloaded records
+	busy        uint32             // used as a guard to avoid concurrent polling
 }
 
 // NewExecDataSync returns a new Exec data sync object using the given AN client and options.
-func NewExecDataSync(log zerolog.Logger, accessNode string, options ...Option) *ExecDataSync {
+func NewExecDataSync(log zerolog.Logger, execDataAddr string, options ...Option) *ExecDataSync {
 
 	cfg := DefaultConfig
 	for _, option := range options {
@@ -46,14 +49,16 @@ func NewExecDataSync(log zerolog.Logger, accessNode string, options ...Option) *
 		panic(err)
 	}
 
+	exeDataApi := getAPIClient(execDataAddr)
+
 	e := ExecDataSync{
-		log:        log.With().Str("component", "exec_data_sync").Logger(),
-		decoder:    decoder,
-		accessNode: accessNode,
-		queue:      archive.NewDeque(),
-		buffer:     archive.NewDeque(),
-		limit:      cfg.BufferSize,
-		busy:       0,
+		log:         log.With().Str("component", "exec_data_sync").Logger(),
+		decoder:     decoder,
+		execDataApi: exeDataApi,
+		queue:       archive.NewDeque(),
+		buffer:      archive.NewDeque(),
+		limit:       cfg.BufferSize,
+		busy:        0,
 	}
 
 	for _, blockID := range cfg.CatchupBlocks {
@@ -62,6 +67,16 @@ func NewExecDataSync(log zerolog.Logger, accessNode string, options ...Option) *
 	}
 
 	return &e
+}
+
+func getAPIClient(addr string) execData.ExecutionDataAPIClient {
+	// connect to Archive-Access instance
+	MaxGRPCMessageSize := 1024 * 1024 * 20 // 20MB
+	conn, err := grpc.Dial(addr, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxGRPCMessageSize)))
+	if err != nil {
+		panic(fmt.Sprintf("unable to create connection to node: %s", addr))
+	}
+	return execData.NewExecutionDataAPIClient(conn)
 }
 
 // OnBlockFinalized is a callback for the Flow consensus follower. It is called

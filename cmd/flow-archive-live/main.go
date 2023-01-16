@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"github.com/onflow/flow-archive/service/datasync"
 	"net"
 	"net/http"
 	"os"
@@ -27,14 +28,12 @@ import (
 	"strconv"
 	"time"
 
-	gcloud "cloud.google.com/go/storage"
 	"github.com/dgraph-io/badger/v2"
 	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
-	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 
 	sdk "github.com/onflow/flow-go-sdk/crypto"
@@ -46,7 +45,6 @@ import (
 	api "github.com/onflow/flow-archive/api/archive"
 	"github.com/onflow/flow-archive/codec/zbor"
 	"github.com/onflow/flow-archive/models/archive"
-	"github.com/onflow/flow-archive/service/cloud"
 	"github.com/onflow/flow-archive/service/forest"
 	"github.com/onflow/flow-archive/service/index"
 	"github.com/onflow/flow-archive/service/initializer"
@@ -77,7 +75,7 @@ func run() int {
 	var (
 		flagAddress     string
 		flagBootstrap   string
-		flagBucket      string
+		flagExecData    string
 		flagCheckpoint  string
 		flagData        string
 		flagIndex       string
@@ -92,9 +90,9 @@ func run() int {
 		flagTracing       bool
 	)
 
-	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving DPS API")
+	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving Archive API")
 	pflag.StringVarP(&flagBootstrap, "bootstrap", "b", "bootstrap", "path to directory with bootstrap information for spork")
-	pflag.StringVarP(&flagBucket, "bucket", "u", "", "Google Cloude Storage bucket with block data records")
+	pflag.StringVarP(&flagExecData, "execdata", "e", "", "address for a execution state data API endpoint")
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to root checkpoint file for execution state trie")
 	pflag.StringVarP(&flagData, "data", "d", "data", "path to database directory for protocol data")
 	pflag.StringVarP(&flagIndex, "index", "i", "index", "path to database directory for state index")
@@ -239,7 +237,7 @@ func run() int {
 		unstaked.WithLogLevel(flagLevel),
 	)
 	if err != nil {
-		log.Error().Err(err).Str("bucket", flagBucket).Msg("could not create consensus follower")
+		log.Error().Err(err).Str("follower", flagSeedAddress).Msg("could not create consensus follower")
 		return failure
 	}
 
@@ -276,23 +274,7 @@ func run() int {
 	// streamer is responsible for retrieving block execution records from a
 	// Google Cloud Storage bucket. This component plays the role of what would
 	// otherwise be a network protocol, such as a publish socket.
-	client, err := gcloud.NewClient(context.Background(),
-		option.WithoutAuthentication(),
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("could not connect GCP client")
-		return failure
-	}
-	defer func() {
-		err := client.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("could not close GCP client")
-		}
-	}()
-	bucket := client.Bucket(flagBucket)
-	stream := cloud.NewGCPStreamer(log, bucket,
-		cloud.WithCatchupBlocks(blockIDs),
-	)
+	stream := datasync.NewExecDataSync(log, flagExecData, datasync.WithCatchupBlocks(blockIDs))
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
