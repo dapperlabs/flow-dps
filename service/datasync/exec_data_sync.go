@@ -183,7 +183,7 @@ func (e *ExecDataSync) getExecData() error {
 func (e *ExecDataSync) pullData(ctx context.Context, blockID flow.Identifier) (*uploader.BlockData, error) {
 	// query AN from cached connection
 	req := &execData.GetExecutionDataByBlockIDRequest{BlockId: blockID[:]}
-	res, err := e.execData.GetExecutionDataByBlockID(ctx, req)
+	res, err := e.execDataApi.GetExecutionDataByBlockID(ctx, req)
 	if err != nil {
 		return nil, err
 	}
