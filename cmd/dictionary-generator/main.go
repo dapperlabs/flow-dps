@@ -20,7 +20,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/outcaste-io/badger/v4"
+	"github.com/dgraph-io/badger/v3"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 

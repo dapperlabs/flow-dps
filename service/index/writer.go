@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/go-multierror"
-	"github.com/outcaste-io/badger/v4"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/onflow/flow-go/ledger"
@@ -38,7 +38,7 @@ type Writer struct {
 	db   *badger.DB
 	lib  archive.WriteLibrary
 	cfg  Config
-	tx   *badger.DB.New
+	tx   *badger.Txn
 	sema *semaphore.Weighted
 	err  chan error
 

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/outcaste-io/badger/v4"
+	"github.com/dgraph-io/badger/v3"
 
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"

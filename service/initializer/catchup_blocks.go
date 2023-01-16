@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/outcaste-io/badger/v4"
+	"github.com/dgraph-io/badger/v3"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"

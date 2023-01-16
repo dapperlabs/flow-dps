@@ -17,7 +17,7 @@ package chain
 import (
 	"errors"
 	"fmt"
-	"github.com/outcaste-io/badger/v4"
+	"github.com/dgraph-io/badger/v3"
 	"math"
 
 	"github.com/onflow/flow-archive/models/archive"

@@ -17,8 +17,8 @@ package storage
 import (
 	"fmt"
 
+	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/go-multierror"
-	"github.com/outcaste-io/badger/v4"
 )
 
 // Fallback goes through the provided operations until one of them succeeds.
@@ -79,7 +79,7 @@ func (l *Library) save(key []byte, value interface{}) func(txn *badger.Txn) erro
 			return fmt.Errorf("could not encode value (key: %x): %w", key, err)
 		}
 
-		err = (key, val)
+		err = tx.Set(key, val)
 		if err != nil {
 			return fmt.Errorf("could not set value (key: %x): %w", key, err)
 		}

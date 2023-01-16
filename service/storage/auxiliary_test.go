@@ -18,8 +18,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/go-multierror"
-	"github.com/outcaste-io/badger/v4"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-archive/service/storage"

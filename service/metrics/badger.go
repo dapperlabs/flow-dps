@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
-	_ "github.com/outcaste-io/badger/v4"
+	_ "github.com/dgraph-io/badger/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
