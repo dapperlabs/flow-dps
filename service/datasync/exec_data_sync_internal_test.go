@@ -1,6 +1,7 @@
 package datasync
 
 import (
+	"github.com/optakt/flow-dps/models/dps"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestNewExecDataSync(t *testing.T) {
 
 func TestGCPStreamer_OnBlockFinalized(t *testing.T) {
 	block := mocks.GenericBlock
-	queue := dps.NewDeque()
+	queue := archive.NewDeque()
 
 	streamer := &ExecDataSync{
 		log:   zerolog.Nop(),
@@ -84,8 +85,8 @@ func TestGCPStreamer_Next(t *testing.T) {
 		streamer := &ExecDataSync{
 			log:     zerolog.Nop(),
 			decoder: decoder,
-			queue:   dps.NewDeque(),
-			buffer:  dps.NewDeque(),
+			queue:   archive.NewDeque(),
+			buffer:  archive.NewDeque(),
 			limit:   999,
 		}
 
@@ -99,8 +100,8 @@ func TestGCPStreamer_Next(t *testing.T) {
 		streamer := &ExecDataSync{
 			log:     zerolog.Nop(),
 			decoder: decoder,
-			queue:   dps.NewDeque(),
-			buffer:  dps.NewDeque(),
+			queue:   archive.NewDeque(),
+			buffer:  archive.NewDeque(),
 			limit:   999,
 		}
 
