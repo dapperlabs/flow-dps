@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/optakt/flow-dps/models/dps"
@@ -165,7 +168,7 @@ func (e *ExecDataSync) getExecData() error {
 
 		// Get the name of the file based on the block ID. The file n
 		blockID := e.queue.PopBack().(flow.Identifier)
-		record, err := e.pullData(blockID)
+		record, err := e.pullData(context.Background(), blockID)
 		if err != nil {
 			e.queue.PushBack(blockID)
 			return fmt.Errorf("could not pull execution record (name: %s): %w", blockID, err)
@@ -191,6 +194,41 @@ func (e *ExecDataSync) pullData(ctx context.Context, blockID flow.Identifier) (*
 }
 
 func convertToBlockData(data *entities.BlockExecutionData) (*uploader.BlockData, error) {
-	// TODO: implement
-	return nil, nil
+	// convert to block exec data defined in flow-go
+	bed, err := convert.MessageToBlockExecutionData(data, flow.Mainnet.Chain())
+	if err != nil {
+		return nil, err
+	}
+
+	collections := make([]*entity.CompleteCollection, 0)
+	events := make([]*flow.Event, 0)
+	trieUpdates := make([]*ledger.TrieUpdate, 0)
+
+	for _, ced := range bed.ChunkExecutionDatas {
+		// combine the collections in the chunks
+		collectionToAdd := entity.CompleteCollection{
+			Guarantee:    nil,
+			Transactions: ced.Collection.Transactions,
+		}
+		collections = append(collections, &collectionToAdd)
+
+		// combine the events in the chunks
+		eventsToAdd := make([]*flow.Event, len(ced.Events))
+		for i := range ced.Events {
+			eventsToAdd[i] = &ced.Events[i]
+		}
+		events = append(events, eventsToAdd...)
+
+		// combine the trie updates in the chunks
+		trieUpdates = append(trieUpdates, ced.TrieUpdate)
+	}
+	blockData := uploader.BlockData{
+		Block:                nil,
+		Collections:          collections,
+		TxResults:            nil,
+		Events:               events,
+		TrieUpdates:          trieUpdates,
+		FinalStateCommitment: flow.StateCommitment{},
+	}
+	return &blockData, nil
 }
