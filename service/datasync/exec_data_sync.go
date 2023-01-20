@@ -36,7 +36,7 @@ type ExecDataSync struct {
 }
 
 // NewExecDataSync returns a new Exec data sync object using the given AN client and options.
-func NewExecDataSync(log zerolog.Logger, execDataAddr string, options ...Option) *ExecDataSync {
+func NewExecDataSync(log zerolog.Logger, execDataAddr string, client execData.ExecutionDataAPIClient, options ...Option) *ExecDataSync {
 
 	cfg := DefaultConfig
 	for _, option := range options {
@@ -52,7 +52,12 @@ func NewExecDataSync(log zerolog.Logger, execDataAddr string, options ...Option)
 		panic(err)
 	}
 
-	exeDataApi := getAPIClient(execDataAddr)
+	var exeDataApi execData.ExecutionDataAPIClient
+	if client == nil {
+		exeDataApi = getAPIClient(execDataAddr)
+	} else {
+		exeDataApi = client
+	}
 
 	e := ExecDataSync{
 		log:         log.With().Str("component", "exec_data_sync").Logger(),
@@ -176,7 +181,6 @@ func (e *ExecDataSync) getExecData() error {
 
 		e.log.Debug().
 			Hex("blockID", blockID[:]).
-			Uint64("height", record.Block.Header.Height).
 			Msg("pushing execution record into buffer")
 
 		e.buffer.PushFront(record)
