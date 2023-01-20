@@ -29,8 +29,7 @@ func TestNewExecDataSync(t *testing.T) {
 		BlockExecutionData: &bed,
 	}
 
-	var mockApiClient execData.ExecutionDataAPIClient
-	mockApiClient = MockExecAPIClient{
+	var mockApiClient execData.ExecutionDataAPIClient = MockExecAPIClient{
 		response: &mockResponse,
 	}
 
@@ -85,8 +84,7 @@ func TestGCPStreamer_Next(t *testing.T) {
 		BlockExecutionData: &bed,
 	}
 
-	var mockApiClient execData.ExecutionDataAPIClient
-	mockApiClient = MockExecAPIClient{
+	var mockApiClient execData.ExecutionDataAPIClient = MockExecAPIClient{
 		response: &mockResponse,
 	}
 
@@ -158,8 +156,4 @@ type MockExecAPIClient struct {
 
 func (m MockExecAPIClient) GetExecutionDataByBlockID(_ context.Context, _ *execData.GetExecutionDataByBlockIDRequest, _ ...grpc.CallOption) (*execData.GetExecutionDataByBlockIDResponse, error) {
 	return m.response, nil
-}
-
-func (m MockExecAPIClient) SetMockResponse(execData execData.GetExecutionDataByBlockIDResponse) {
-	m.response = &execData
 }
