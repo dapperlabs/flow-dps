@@ -14,7 +14,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/klauspost/compress v1.15.10
-	github.com/labstack/echo/v4 v4.5.0
 	github.com/onflow/cadence v0.31.3
 	github.com/onflow/flow-go v0.29.6
 	github.com/onflow/flow-go-sdk v0.31.3
