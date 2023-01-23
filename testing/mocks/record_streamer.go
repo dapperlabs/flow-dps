@@ -16,12 +16,10 @@ package mocks
 
 import (
 	"testing"
-
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 )
 
 type RecordStreamer struct {
-	NextFunc func() (*uploader.BlockData, error)
+	NextFunc func() (*BlockData, error)
 }
 
 func BaselineRecordStreamer(t *testing.T) *RecordStreamer {

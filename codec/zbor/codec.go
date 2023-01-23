@@ -20,8 +20,8 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/koko1123/flow-go-1/ledger"
+	"github.com/koko1123/flow-go-1/model/flow"
 )
 
 // Codec encodes and decodes Go values using cbor encoding and zstandard compression.

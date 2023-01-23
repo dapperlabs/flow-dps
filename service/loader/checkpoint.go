@@ -19,8 +19,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/koko1123/flow-go-1/ledger/complete/mtrie/trie"
+	"github.com/koko1123/flow-go-1/ledger/complete/wal"
 )
 
 // Checkpoint is a loader that loads a trie from a LedgerWAL checkpoint file.

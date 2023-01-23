@@ -22,9 +22,9 @@ import (
 
 	"github.com/onflow/flow-archive/models/archive"
 
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/koko1123/flow-go-1/model/flow"
+	"github.com/koko1123/flow-go-1/storage"
+	"github.com/koko1123/flow-go-1/storage/badger/operation"
 )
 
 // Disk is a component used to access chain data from a badger database.

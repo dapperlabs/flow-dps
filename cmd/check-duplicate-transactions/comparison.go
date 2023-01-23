@@ -20,8 +20,8 @@ import (
 	"github.com/dgraph-io/badger/v3"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/koko1123/flow-go-1/model/flow"
+	"github.com/koko1123/flow-go-1/storage/badger/operation"
 
 	"github.com/onflow/flow-archive/codec/zbor"
 	"github.com/onflow/flow-archive/models/archive"

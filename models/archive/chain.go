@@ -15,7 +15,7 @@
 package archive
 
 import (
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/koko1123/flow-go-1/model/flow"
 )
 
 // Chain represents something that has access to chain data.

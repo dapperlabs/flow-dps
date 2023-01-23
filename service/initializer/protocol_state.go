@@ -22,17 +22,17 @@ import (
 
 	"github.com/dgraph-io/badger/v3"
 
-	"github.com/onflow/flow-go/module/metrics"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/storage"
-	cache "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/koko1123/flow-go-1/module/metrics"
+	protocol "github.com/koko1123/flow-go-1/state/protocol/badger"
+	"github.com/koko1123/flow-go-1/state/protocol/inmem"
+	"github.com/koko1123/flow-go-1/storage"
+	cache "github.com/koko1123/flow-go-1/storage/badger"
+	"github.com/koko1123/flow-go-1/storage/badger/operation"
 )
 
 // ProtocolState initializes the Flow protocol state in the given database. The
 // code is inspired by the related unexported code in the Flow Go code base:
-// https://github.com/onflow/flow-go/blob/v0.21.0/cmd/bootstrap/cmd/finalize.go#L452
+// https://github.com/koko1123/flow-go-1/blob/v0.21.0/cmd/bootstrap/cmd/finalize.go#L452
 func ProtocolState(file io.Reader, db *badger.DB) error {
 
 	// If we already have a root height, skip bootstrapping.

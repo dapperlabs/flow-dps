@@ -17,9 +17,9 @@ package mocks
 import (
 	"testing"
 
+	"github.com/koko1123/flow-go-1/model/flow"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type VirtualMachine struct {

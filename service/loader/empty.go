@@ -15,7 +15,7 @@
 package loader
 
 import (
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/koko1123/flow-go-1/ledger/complete/mtrie/trie"
 )
 
 // Empty is a loader that loads as empty execution state trie.

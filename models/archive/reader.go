@@ -15,8 +15,8 @@
 package archive
 
 import (
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/koko1123/flow-go-1/ledger"
+	"github.com/koko1123/flow-go-1/model/flow"
 )
 
 // Reader represents something that can read from a DPS index.

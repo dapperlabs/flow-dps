@@ -15,7 +15,7 @@
 package convert
 
 import (
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/koko1123/flow-go-1/model/flow"
 )
 
 // IDToHash converts a flow Identifier into a byte slice.

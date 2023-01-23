@@ -15,9 +15,9 @@
 package invoker
 
 import (
+	"github.com/koko1123/flow-go-1/model/flow"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // VirtualMachine represents a Flow Virtual Machine on which to run scripts and

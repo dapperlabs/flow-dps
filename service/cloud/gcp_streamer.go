@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/koko1123/flow-go-1/consensus/hotstuff/model"
 	"io"
 	"sync/atomic"
 
@@ -26,8 +26,8 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/koko1123/flow-go-1/model/flow"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-archive/models/archive"
 )

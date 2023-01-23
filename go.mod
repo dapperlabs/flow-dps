@@ -1,6 +1,6 @@
 module github.com/onflow/flow-archive
 
-go 1.18
+go 1.19
 
 require (
 	cloud.google.com/go/storage v1.23.0
@@ -14,9 +14,9 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/klauspost/compress v1.15.10
 	github.com/labstack/echo/v4 v4.5.0
-	github.com/onflow/cadence v0.30.0
+	github.com/onflow/cadence v0.31.3
 	github.com/onflow/flow-go v0.29.0
-	github.com/onflow/flow-go-sdk v0.30.0
+	github.com/onflow/flow-go-sdk v0.31.3
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/tsdb v0.7.1
 	github.com/rs/zerolog v1.28.0
@@ -30,7 +30,8 @@ require (
 
 require (
 	github.com/dgraph-io/badger/v3 v3.2103.5
-	github.com/onflow/flow-go/crypto v0.24.4
+	github.com/koko1123/flow-go-1 v0.26.9-fix-storage
+	github.com/onflow/flow-go/crypto v0.24.6
 	github.com/optakt/flow-dps-rosetta v1.0.0
 	github.com/srikrsna/protoc-gen-gotag v0.6.2
 	go.opentelemetry.io/otel v1.11.1
@@ -60,7 +61,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.3.0 // indirect
-	github.com/btcsuite/btcd v0.22.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -200,8 +201,8 @@ require (
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221214150253-cb74e7764c12 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221214150253-cb74e7764c12 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221216161720-c1b31d5a4722 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221216161720-c1b31d5a4722 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 // indirect
@@ -277,4 +278,4 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
 
-// replace github.com/onflow/flow-go/crypto => /flow-go/crypto
+replace github.com/onflow/flow-go/crypto => ../flow-go/crypto
