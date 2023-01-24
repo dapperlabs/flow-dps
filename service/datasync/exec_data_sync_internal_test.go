@@ -143,10 +143,8 @@ func TestGCPStreamer_Next(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, dps.ErrUnavailable)
 
-		select {
-		case <-time.After(100 * time.Millisecond):
-			t.Log("GCP Streamer did not attempt to download record from bucket")
-		}
+		time.Sleep(100 * time.Millisecond)
+		t.Log("GCP Streamer did not attempt to download record from bucket")
 	})
 }
 
