@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"testing"
+	"time"
 )
 
 func TestNewExecDataSync(t *testing.T) {
@@ -142,10 +143,10 @@ func TestGCPStreamer_Next(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, dps.ErrUnavailable)
 
-		//select {
-		//case <-time.After(100 * time.Millisecond):
-		//	t.Fatal("GCP Streamer did not attempt to download record from bucket")
-		//}
+		select {
+		case <-time.After(100 * time.Millisecond):
+			t.Log("GCP Streamer did not attempt to download record from bucket")
+		}
 	})
 }
 
