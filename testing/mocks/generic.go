@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/koko1123/flow-go-1/consensus/hotstuff/model"
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"github.com/koko1123/flow-go-1/ledger/complete/mtrie/trie"
 	"io"
 	"math/rand"
@@ -36,7 +37,6 @@ import (
 	"github.com/onflow/cadence/runtime/tests/utils"
 	"github.com/onflow/flow-go/crypto"
 	chash "github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-archive/models/archive"
 )

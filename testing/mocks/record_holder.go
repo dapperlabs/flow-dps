@@ -15,11 +15,11 @@
 package mocks
 
 import (
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"testing"
 
 	"github.com/koko1123/flow-go-1/model/flow"
 	"github.com/koko1123/flow-go-1/module/mempool/entity"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 )
 
 type RecordHolder struct {

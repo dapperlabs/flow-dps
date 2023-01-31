@@ -15,11 +15,12 @@
 package mocks
 
 import (
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"testing"
 )
 
 type RecordStreamer struct {
-	NextFunc func() (*BlockData, error)
+	NextFunc func() (*uploader.BlockData, error)
 }
 
 func BaselineRecordStreamer(t *testing.T) *RecordStreamer {

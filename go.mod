@@ -30,9 +30,8 @@ require (
 
 require (
 	github.com/dgraph-io/badger/v3 v3.2103.5
-	github.com/koko1123/flow-go-1 v0.26.9-fix-storage
-	github.com/onflow/flow-go/crypto v0.24.6
-	github.com/optakt/flow-dps-rosetta v1.0.0
+	github.com/koko1123/flow-go-1 v0.29.6-upgrade-to-badger-v3.0.20230131055326-ccf4033e97d5
+	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/srikrsna/protoc-gen-gotag v0.6.2
 	go.opentelemetry.io/otel v1.11.1
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.8.0
@@ -61,7 +60,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.3.0 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
+	github.com/btcsuite/btcd v0.22.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -277,5 +276,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
-
-replace github.com/onflow/flow-go/crypto => ../flow-go/crypto

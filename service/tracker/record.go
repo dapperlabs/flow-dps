@@ -15,8 +15,8 @@
 package tracker
 
 import (
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"github.com/koko1123/flow-go-1/model/flow"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 )
 
 // RecordStreamer represents something that can stream block data.

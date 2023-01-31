@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/koko1123/flow-go-1/consensus/hotstuff/model"
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"io"
 	"sync/atomic"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/koko1123/flow-go-1/model/flow"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-archive/models/archive"
 )
