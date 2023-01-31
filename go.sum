@@ -771,10 +771,6 @@ github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa02
 github.com/klauspost/cpuid/v2 v2.0.12/go.mod h1:g2LTdtYhdyuGPqyWyv7qRAmj1WBqxuObKfj5c0PQa7c=
 github.com/klauspost/cpuid/v2 v2.1.1 h1:t0wUqjowdm8ezddV5k0tLWVklVuvLJpoHeb4WBdydm0=
 github.com/klauspost/cpuid/v2 v2.1.1/go.mod h1:RVVoqg1df56z8g3pUjL/3lE5UfnlrJX8tyFgg4nqhuY=
-github.com/koko1123/flow-go-1 v0.26.9-fix-storage h1:3cmvCQijKRDJ/AYt7+xHnSXKR/C4ZTTlknnN3MltR8o=
-github.com/koko1123/flow-go-1 v0.26.9-fix-storage/go.mod h1:jL7voVVn8jRskn6mApsusYrtwkBlfB5HUxQuPBDXsFs=
-github.com/koko1123/flow-go-1 v0.29.6-upgrade-to-badger-v3.0.20230131055326-ccf4033e97d5 h1:LCLGe68Cb9jPlnAnfb3xoUArrVQLGtyKgR2x2T1zPRU=
-github.com/koko1123/flow-go-1 v0.29.6-upgrade-to-badger-v3.0.20230131055326-ccf4033e97d5/go.mod h1:jfN3uDYP2Jk4XFZezdPL6c1THVmTklQVSaIzBVvpkp0=
 github.com/koko1123/flow-go-1 v0.29.6-upgrade-to-badger-v3.0.20230131060215-c8d5a186ad74 h1:9NSm5EX8fgEUpiDihO5hUm+cbeSkECnNGgzuSh37jV4=
 github.com/koko1123/flow-go-1 v0.29.6-upgrade-to-badger-v3.0.20230131060215-c8d5a186ad74/go.mod h1:jfN3uDYP2Jk4XFZezdPL6c1THVmTklQVSaIzBVvpkp0=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
