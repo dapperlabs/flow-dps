@@ -1,19 +1,18 @@
 package datasync
 
 import (
-	"context"
+	"testing"
+
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-archive/testing/mocks"
+	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/optakt/flow-dps/models/dps"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"testing"
-	"time"
 )
 
 func TestNewExecDataSync(t *testing.T) {
@@ -30,8 +29,8 @@ func TestNewExecDataSync(t *testing.T) {
 		BlockExecutionData: &bed,
 	}
 
-	var mockApiClient execData.ExecutionDataAPIClient = MockExecAPIClient{
-		response: &mockResponse,
+	var mockApiClient execData.ExecutionDataAPIClient = mocks.MockExecAPIClient{
+		Response: &mockResponse,
 	}
 
 	streamer := NewExecDataSync(
@@ -85,8 +84,8 @@ func TestGCPStreamer_Next(t *testing.T) {
 		BlockExecutionData: &bed,
 	}
 
-	var mockApiClient execData.ExecutionDataAPIClient = MockExecAPIClient{
-		response: &mockResponse,
+	var mockApiClient execData.ExecutionDataAPIClient = mocks.MockExecAPIClient{
+		Response: &mockResponse,
 	}
 
 	t.Run("returns available record if buffer not empty", func(t *testing.T) {
@@ -136,23 +135,14 @@ func TestGCPStreamer_Next(t *testing.T) {
 			limit:       999,
 		}
 
-		streamer.queue.PushFront(record.Block.ID())
+		streamer.queue.PushFront(convert.MessageToIdentifier(record.BlockId))
 
 		_, err = streamer.Next()
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, dps.ErrUnavailable)
 
-		time.Sleep(100 * time.Millisecond)
-		t.Log("GCP Streamer did not attempt to download record from bucket")
+		//time.Sleep(100 * time.Millisecond)
+		//assert.Failf(t, "GCP Streamer did not attempt to download record from bucket", "asda")
 	})
-}
-
-// TODO: Replace this with Mockery
-type MockExecAPIClient struct {
-	response *execData.GetExecutionDataByBlockIDResponse
-}
-
-func (m MockExecAPIClient) GetExecutionDataByBlockID(_ context.Context, _ *execData.GetExecutionDataByBlockIDRequest, _ ...grpc.CallOption) (*execData.GetExecutionDataByBlockIDResponse, error) {
-	return m.response, nil
 }

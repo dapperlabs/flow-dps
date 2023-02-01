@@ -30,10 +30,11 @@ type State struct {
 	next      flow.StateCommitment
 	registers map[ledger.Path]*ledger.Payload
 	done      chan struct{}
+	chain     flow.Chain
 }
 
 // EmptyState returns a new empty state that uses the given forest.
-func EmptyState(forest Forest) *State {
+func EmptyState(forest Forest, chain flow.Chain) *State {
 
 	s := State{
 		forest:    forest,
@@ -43,6 +44,7 @@ func EmptyState(forest Forest) *State {
 		next:      flow.DummyStateCommitment,
 		registers: make(map[ledger.Path]*ledger.Payload),
 		done:      make(chan struct{}),
+		chain:     chain,
 	}
 
 	return &s

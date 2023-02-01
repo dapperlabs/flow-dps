@@ -15,14 +15,16 @@
 package tracker_test
 
 import (
+	"github.com/onflow/flow-go/access/legacy/convert"
+	convert2 "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-archive/service/tracker"
 	"github.com/onflow/flow-archive/testing/helpers"
@@ -327,112 +329,6 @@ func TestConsensus_Seals(t *testing.T) {
 	})
 }
 
-func TestConsensus_Commit(t *testing.T) {
-	header := mocks.GenericHeader
-	record := mocks.GenericRecord()
-
-	t.Run("nominal case", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*uploader.BlockData, error) {
-			assert.Equal(t, header.ID(), blockID)
-
-			return record, nil
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		got, err := cons.Commit(header.Height)
-
-		require.NoError(t, err)
-		assert.Equal(t, record.FinalStateCommitment, got)
-	})
-
-	t.Run("handles requested height over last finalized height", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
-			return record, nil
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		_, err := cons.Commit(header.Height + 999)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles missing block height index in DB", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
-			return record, nil
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		_, err := cons.Commit(header.Height)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles record holder failure", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
-			return nil, mocks.GenericError
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		_, err := cons.Commit(header.Height)
-
-		assert.Error(t, err)
-	})
-}
-
 func TestConsensus_Collections(t *testing.T) {
 	header := mocks.GenericHeader
 	record := mocks.GenericRecord()
@@ -443,10 +339,9 @@ func TestConsensus_Collections(t *testing.T) {
 		db := helpers.InMemoryDB(t)
 		defer db.Close()
 
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
-
+		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, convert.MessageToIdentifier(record.BlockId))))
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
 			assert.Equal(t, header.ID(), blockID)
 
 			return record, nil
@@ -459,12 +354,13 @@ func TestConsensus_Collections(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		got, err := cons.Collections(header.Height)
-
+		got, err := cons.Collections(header.Height, flow.Testnet.Chain())
 		require.NoError(t, err)
-		require.Len(t, got, len(record.Collections))
-		for i, collection := range record.Collections {
-			for _, tx := range collection.Transactions {
+		require.Len(t, got, len(record.ChunkExecutionData))
+		for i, chunk := range record.ChunkExecutionData {
+			ced, err := convert2.MessageToChunkExecutionData(chunk, flow.Testnet.Chain())
+			require.NoError(t, err, "could not convert chunk exec data")
+			for _, tx := range ced.Collection.Transactions {
 				assert.Contains(t, got[i].Transactions, tx.ID())
 			}
 		}
@@ -479,7 +375,7 @@ func TestConsensus_Collections(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -490,7 +386,7 @@ func TestConsensus_Collections(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		_, err := cons.Collections(header.Height + 999)
+		_, err := cons.Collections(header.Height+999, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -502,7 +398,7 @@ func TestConsensus_Collections(t *testing.T) {
 		defer db.Close()
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -513,7 +409,7 @@ func TestConsensus_Collections(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		_, err := cons.Collections(header.Height)
+		_, err := cons.Collections(header.Height, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -527,7 +423,7 @@ func TestConsensus_Collections(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 
@@ -538,7 +434,7 @@ func TestConsensus_Collections(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		_, err := cons.Collections(header.Height)
+		_, err := cons.Collections(header.Height, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -557,7 +453,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
 			assert.Equal(t, header.ID(), blockID)
 
 			return record, nil
@@ -570,11 +466,13 @@ func TestConsensus_Transactions(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		got, err := cons.Transactions(header.Height)
+		got, err := cons.Transactions(header.Height, flow.Testnet.Chain())
 
 		require.NoError(t, err)
-		for _, collection := range record.Collections {
-			for _, tx := range collection.Transactions {
+		for _, chunk := range record.ChunkExecutionData {
+			ced, err := convert2.MessageToChunkExecutionData(chunk, flow.Testnet.Chain())
+			require.NoError(t, err, "could not convert chunk exec data")
+			for _, tx := range ced.Collection.Transactions {
 				assert.Contains(t, got, tx)
 			}
 		}
@@ -589,7 +487,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -600,7 +498,7 @@ func TestConsensus_Transactions(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		_, err := cons.Transactions(header.Height + 999)
+		_, err := cons.Transactions(header.Height+999, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -612,7 +510,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		defer db.Close()
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -623,7 +521,7 @@ func TestConsensus_Transactions(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		_, err := cons.Transactions(header.Height)
+		_, err := cons.Transactions(header.Height, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -637,7 +535,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 
@@ -648,117 +546,118 @@ func TestConsensus_Transactions(t *testing.T) {
 			tracker.WithHolder(holder),
 		)
 
-		_, err := cons.Transactions(header.Height)
+		_, err := cons.Transactions(header.Height, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
 }
 
-func TestConsensus_Results(t *testing.T) {
-	header := mocks.GenericHeader
-	record := mocks.GenericRecord()
-
-	t.Run("nominal case", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*uploader.BlockData, error) {
-			assert.Equal(t, header.ID(), blockID)
-
-			return record, nil
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		got, err := cons.Results(header.Height)
-
-		require.NoError(t, err)
-		assert.Equal(t, record.TxResults, got)
-	})
-
-	t.Run("handles requested height over last finalized height", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
-			return record, nil
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		_, err := cons.Results(header.Height + 999)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles missing block height index in DB", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
-			return record, nil
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		_, err := cons.Results(header.Height)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles record holder failure", func(t *testing.T) {
-		t.Parallel()
-
-		db := helpers.InMemoryDB(t)
-		defer db.Close()
-
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
-
-		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
-			return nil, mocks.GenericError
-		}
-
-		cons := tracker.BaselineConsensus(
-			t,
-			tracker.WithDB(db),
-			tracker.WithLast(header.Height),
-			tracker.WithHolder(holder),
-		)
-
-		_, err := cons.Results(header.Height)
-
-		assert.Error(t, err)
-	})
-}
+// TODO: Re-add when transaction results are available from execution data
+//func TestConsensus_Results(t *testing.T) {
+//	header := mocks.GenericHeader
+//	record := mocks.GenericRecord()
+//
+//	t.Run("nominal case", func(t *testing.T) {
+//		t.Parallel()
+//
+//		db := helpers.InMemoryDB(t)
+//		defer db.Close()
+//
+//		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
+//
+//		holder := mocks.BaselineRecordHolder(t)
+//		holder.RecordFunc = func(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
+//			assert.Equal(t, header.ID(), blockID)
+//
+//			return record, 0, nil
+//		}
+//
+//		cons := tracker.BaselineConsensus(
+//			t,
+//			tracker.WithDB(db),
+//			tracker.WithLast(header.Height),
+//			tracker.WithHolder(holder),
+//		)
+//
+//		got, err := cons.Results(header.Height)
+//
+//		require.NoError(t, err)
+//		assert.Equal(t, record.TxResults, got)
+//	})
+//
+//	t.Run("handles requested height over last finalized height", func(t *testing.T) {
+//		t.Parallel()
+//
+//		db := helpers.InMemoryDB(t)
+//		defer db.Close()
+//
+//		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
+//
+//		holder := mocks.BaselineRecordHolder(t)
+//		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+//			return record, 0, nil
+//		}
+//
+//		cons := tracker.BaselineConsensus(
+//			t,
+//			tracker.WithDB(db),
+//			tracker.WithLast(header.Height),
+//			tracker.WithHolder(holder),
+//		)
+//
+//		_, err := cons.Results(header.Height + 999)
+//
+//		assert.Error(t, err)
+//	})
+//
+//	t.Run("handles missing block height index in DB", func(t *testing.T) {
+//		t.Parallel()
+//
+//		db := helpers.InMemoryDB(t)
+//		defer db.Close()
+//
+//		holder := mocks.BaselineRecordHolder(t)
+//		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+//			return record, 0, nil
+//		}
+//
+//		cons := tracker.BaselineConsensus(
+//			t,
+//			tracker.WithDB(db),
+//			tracker.WithLast(header.Height),
+//			tracker.WithHolder(holder),
+//		)
+//
+//		_, err := cons.Results(header.Height)
+//
+//		assert.Error(t, err)
+//	})
+//
+//	t.Run("handles record holder failure", func(t *testing.T) {
+//		t.Parallel()
+//
+//		db := helpers.InMemoryDB(t)
+//		defer db.Close()
+//
+//		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
+//
+//		holder := mocks.BaselineRecordHolder(t)
+//		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+//			return nil, 0, mocks.GenericError
+//		}
+//
+//		cons := tracker.BaselineConsensus(
+//			t,
+//			tracker.WithDB(db),
+//			tracker.WithLast(header.Height),
+//			tracker.WithHolder(holder),
+//		)
+//
+//		_, err := cons.Results(header.Height)
+//
+//		assert.Error(t, err)
+//	})
+//}
 
 func TestConsensus_Events(t *testing.T) {
 	header := mocks.GenericHeader
@@ -773,7 +672,7 @@ func TestConsensus_Events(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
 			assert.Equal(t, header.ID(), blockID)
 
 			return record, nil
@@ -789,9 +688,17 @@ func TestConsensus_Events(t *testing.T) {
 		got, err := cons.Events(header.Height)
 
 		require.NoError(t, err)
-		assert.Len(t, got, len(record.Events))
-		for _, event := range record.Events {
-			assert.Contains(t, got, *event)
+		eventLen := 0
+		for _, chunk := range record.ChunkExecutionData {
+			eventLen += len(chunk.Events)
+		}
+		assert.Len(t, got, eventLen)
+		for _, chunk := range record.ChunkExecutionData {
+			ced, err := convert2.MessageToChunkExecutionData(chunk, flow.Testnet.Chain())
+			require.NoError(t, err, "could not convert chunk exec data")
+			for _, event := range ced.Events {
+				assert.Contains(t, got, event)
+			}
 		}
 	})
 
@@ -804,7 +711,7 @@ func TestConsensus_Events(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -827,7 +734,7 @@ func TestConsensus_Events(t *testing.T) {
 		defer db.Close()
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -852,7 +759,7 @@ func TestConsensus_Events(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*uploader.BlockData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 

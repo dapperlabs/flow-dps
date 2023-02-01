@@ -256,27 +256,27 @@ func (t *Transitions) IndexChain(s *State) error {
 	// Next, we try to retrieve the next commit until it becomes available,
 	// at which point all the data coming from the execution data should be
 	// available.
-	commit, err := t.chain.Commit(s.height)
-	if errors.Is(err, archive.ErrUnavailable) {
-		log.Debug().Msg("waiting for next state commitment")
-		time.Sleep(t.cfg.WaitInterval)
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("could not get commit: %w", err)
-	}
-	collections, err := t.chain.Collections(s.height)
+	//commit, err := t.chain.Commit(s.height)
+	//if errors.Is(err, archive.ErrUnavailable) {
+	//	log.Debug().Msg("waiting for next state commitment")
+	//	time.Sleep(t.cfg.WaitInterval)
+	//	return nil
+	//}
+	//if err != nil {
+	//	return fmt.Errorf("could not get commit: %w", err)
+	//}
+	collections, err := t.chain.Collections(s.height, s.chain)
 	if err != nil {
 		return fmt.Errorf("could not get collections: %w", err)
 	}
-	transactions, err := t.chain.Transactions(s.height)
+	transactions, err := t.chain.Transactions(s.height, s.chain)
 	if err != nil {
 		return fmt.Errorf("could not get transactions: %w", err)
 	}
-	results, err := t.chain.Results(s.height)
-	if err != nil {
-		return fmt.Errorf("could not get transaction results: %w", err)
-	}
+	//results, err := t.chain.Results(s.height)
+	//if err != nil {
+	//	return fmt.Errorf("could not get transaction results: %w", err)
+	//}
 	events, err := t.chain.Events(s.height)
 	if err != nil {
 		return fmt.Errorf("could not get events: %w", err)
@@ -284,10 +284,10 @@ func (t *Transitions) IndexChain(s *State) error {
 
 	// Next, all we need to do is index the remaining data and we have fully
 	// processed indexing for this block height.
-	err = t.write.Commit(s.height, commit)
-	if err != nil {
-		return fmt.Errorf("could not index commit: %w", err)
-	}
+	//err = t.write.Commit(s.height, commit)
+	//if err != nil {
+	//	return fmt.Errorf("could not index commit: %w", err)
+	//}
 	err = t.write.Collections(s.height, collections)
 	if err != nil {
 		return fmt.Errorf("could not index collections: %w", err)
@@ -296,10 +296,10 @@ func (t *Transitions) IndexChain(s *State) error {
 	if err != nil {
 		return fmt.Errorf("could not index transactions: %w", err)
 	}
-	err = t.write.Results(results)
-	if err != nil {
-		return fmt.Errorf("could not index transaction results: %w", err)
-	}
+	//err = t.write.Results(results)
+	//if err != nil {
+	//	return fmt.Errorf("could not index transaction results: %w", err)
+	//}
 	err = t.write.Events(s.height, events)
 	if err != nil {
 		return fmt.Errorf("could not index events: %w", err)
@@ -315,7 +315,7 @@ func (t *Transitions) IndexChain(s *State) error {
 	// have just retrieved for the new block height. This is the sentinel that
 	// tells us when we have collected enough trie updates for the forest to
 	// have reached the next finalized block.
-	s.next = commit
+	//s.next = commit
 
 	log.Info().Msg("indexed blockchain data for finalized block")
 

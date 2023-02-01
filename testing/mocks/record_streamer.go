@@ -15,20 +15,19 @@
 package mocks
 
 import (
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"testing"
-
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 )
 
 type RecordStreamer struct {
-	NextFunc func() (*uploader.BlockData, error)
+	NextFunc func() (*entities.BlockExecutionData, error)
 }
 
 func BaselineRecordStreamer(t *testing.T) *RecordStreamer {
 	t.Helper()
 
 	r := RecordStreamer{
-		NextFunc: func() (*uploader.BlockData, error) {
+		NextFunc: func() (*entities.BlockExecutionData, error) {
 			return GenericRecord(), nil
 		},
 	}
@@ -36,6 +35,6 @@ func BaselineRecordStreamer(t *testing.T) *RecordStreamer {
 	return &r
 }
 
-func (r *RecordStreamer) Next() (*uploader.BlockData, error) {
+func (r *RecordStreamer) Next() (*entities.BlockExecutionData, error) {
 	return r.NextFunc()
 }

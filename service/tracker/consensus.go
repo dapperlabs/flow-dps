@@ -16,9 +16,10 @@ package tracker
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/access/legacy/convert"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	convert2 "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -180,30 +181,9 @@ func (c *Consensus) Seals(height uint64) ([]*flow.Seal, error) {
 	return seals, nil
 }
 
-// Commit returns the state commitment for the given height, if available.
-func (c *Consensus) Commit(height uint64) (flow.StateCommitment, error) {
-
-	if height > c.last {
-		return flow.DummyStateCommitment, archive.ErrUnavailable
-	}
-
-	var blockID flow.Identifier
-	err := c.db.View(operation.LookupBlockHeight(height, &blockID))
-	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("could not look up block: %w", err)
-	}
-
-	record, err := c.hold.Record(blockID)
-	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("could not get record: %w", err)
-	}
-
-	return record.FinalStateCommitment, nil
-}
-
 // Collections returns the light collections for the finalized block at the
 // given height.
-func (c *Consensus) Collections(height uint64) ([]*flow.LightCollection, error) {
+func (c *Consensus) Collections(height uint64, chain flow.Chain) ([]*flow.LightCollection, error) {
 
 	if height > c.last {
 		return nil, archive.ErrUnavailable
@@ -220,10 +200,14 @@ func (c *Consensus) Collections(height uint64) ([]*flow.LightCollection, error) 
 		return nil, fmt.Errorf("could not get record: %w", err)
 	}
 
-	collections := make([]*flow.LightCollection, 0, len(record.Collections))
-	for _, complete := range record.Collections {
-		collection := complete.Collection().Light()
-		collections = append(collections, &collection)
+	collections := make([]*flow.LightCollection, 0, len(record.ChunkExecutionData))
+	for _, ced := range record.ChunkExecutionData {
+		chunk, err := convert2.MessageToChunkExecutionData(ced, chain)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert record: %w", err)
+		}
+		nextLightCollection := chunk.Collection.Light()
+		collections = append(collections, &nextLightCollection)
 	}
 
 	return collections, nil
@@ -231,7 +215,7 @@ func (c *Consensus) Collections(height uint64) ([]*flow.LightCollection, error) 
 
 // Transactions returns the transaction bodies for the finalized block at the
 // given height.
-func (c *Consensus) Transactions(height uint64) ([]*flow.TransactionBody, error) {
+func (c *Consensus) Transactions(height uint64, chain flow.Chain) ([]*flow.TransactionBody, error) {
 
 	if height > c.last {
 		return nil, archive.ErrUnavailable
@@ -248,9 +232,15 @@ func (c *Consensus) Transactions(height uint64) ([]*flow.TransactionBody, error)
 		return nil, fmt.Errorf("could not get record: %w", err)
 	}
 
-	transactions := make([]*flow.TransactionBody, 0, len(record.Collections))
-	for _, complete := range record.Collections {
-		transactions = append(transactions, complete.Transactions...)
+	transactions := make([]*flow.TransactionBody, 0)
+	for _, ced := range record.ChunkExecutionData {
+		chunk, err := convert2.MessageToChunkExecutionData(ced, chain)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert record: %w", err)
+		}
+
+		transactionsToAdd := chunk.Collection.Transactions
+		transactions = append(transactions, transactionsToAdd...)
 	}
 
 	return transactions, nil
@@ -258,24 +248,25 @@ func (c *Consensus) Transactions(height uint64) ([]*flow.TransactionBody, error)
 
 // Results returns the transaction results for the finalized block at the
 // given height.
-func (c *Consensus) Results(height uint64) ([]*flow.TransactionResult, error) {
+// TODO: Implement when transaction results are available from execution data
+func (c *Consensus) Results(_ uint64) ([]*flow.TransactionResult, error) {
+	//if height > c.last {
+	//	return nil, archive.ErrUnavailable
+	//}
+	//
+	//var blockID flow.Identifier
+	//err := c.db.View(operation.LookupBlockHeight(height, &blockID))
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not look up block: %w", err)
+	//}
+	//
+	//record, _, err := c.hold.Record(blockID)
+	//record.ChunkExecutionData[0].Events[0].
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not get record: %w", err)
+	//}
 
-	if height > c.last {
-		return nil, archive.ErrUnavailable
-	}
-
-	var blockID flow.Identifier
-	err := c.db.View(operation.LookupBlockHeight(height, &blockID))
-	if err != nil {
-		return nil, fmt.Errorf("could not look up block: %w", err)
-	}
-
-	record, err := c.hold.Record(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get record: %w", err)
-	}
-
-	return record.TxResults, nil
+	return nil, nil
 }
 
 // Events returns the transaction events for the finalized block at the
@@ -294,12 +285,27 @@ func (c *Consensus) Events(height uint64) ([]flow.Event, error) {
 
 	record, err := c.hold.Record(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get record: %w", err)
+		return nil, err
+	}
+	events := make([]flow.Event, 0)
+
+	for _, chunk := range record.ChunkExecutionData {
+		eventsToAdd := make([]flow.Event, 0)
+		for _, event := range chunk.Events {
+			convertedEvent := flow.Event{
+				Type:             flow.EventType(event.Type),
+				TransactionID:    convert.MessageToIdentifier(event.TransactionId),
+				TransactionIndex: event.TransactionIndex,
+				EventIndex:       event.EventIndex,
+				Payload:          event.Payload,
+			}
+			eventsToAdd = append(eventsToAdd, convertedEvent)
+		}
+		events = append(events, eventsToAdd...)
 	}
 
-	events := make([]flow.Event, 0, len(record.Events))
-	for _, event := range record.Events {
-		events = append(events, *event)
+	if err != nil {
+		return nil, fmt.Errorf("could not get record: %w", err)
 	}
 
 	return events, nil

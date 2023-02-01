@@ -18,40 +18,49 @@ import (
 	"testing"
 
 	"github.com/gammazero/deque"
+	"github.com/onflow/flow-go/access/legacy/convert"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-
+	convert2 "github.com/onflow/flow-archive/models/convert"
 	"github.com/onflow/flow-archive/service/tracker"
+	"github.com/onflow/flow-archive/testing/helpers"
 	"github.com/onflow/flow-archive/testing/mocks"
 )
 
 func TestExecution_Update(t *testing.T) {
 	record := mocks.GenericRecord()
 	update := mocks.GenericTrieUpdate(5)
+	header := mocks.GenericHeader
 
 	t.Run("nominal case with nothing in queue", func(t *testing.T) {
 		t.Parallel()
 
+		db := helpers.InMemoryDB(t)
+		defer db.Close()
+
 		streamer := mocks.BaselineRecordStreamer(t)
-		streamer.NextFunc = func() (*uploader.BlockData, error) {
+		streamer.NextFunc = func() (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
-		exec := tracker.BaselineExecution(t, tracker.WithStreamer(streamer))
-
+		require.NoError(t, db.Update(operation.InsertHeader(convert.MessageToIdentifier(record.BlockId), header)))
+		exec := tracker.BaselineExecution(t, tracker.WithStreamer(streamer), tracker.WithExecDB(db))
 		got, err := exec.Update()
 
 		require.NoError(t, err)
-		assert.Equal(t, record.TrieUpdates[0], got)
+		trieUpdate, err := convert2.MessageToTrieUpdate(record.ChunkExecutionData[0].TrieUpdate)
+		require.NoError(t, err)
+		assert.Equal(t, trieUpdate, got)
 	})
 
 	t.Run("nominal case with queue already filled", func(t *testing.T) {
 		t.Parallel()
 
 		streamer := mocks.BaselineRecordStreamer(t)
-		streamer.NextFunc = func() (*uploader.BlockData, error) {
+		streamer.NextFunc = func() (*entities.BlockExecutionData, error) {
 			t.Fatal("unexpected call to streamer.Next()") // This should never be called, since the queue is already filled.
 			return record, nil
 		}
@@ -75,7 +84,7 @@ func TestExecution_Update(t *testing.T) {
 		t.Parallel()
 
 		streamer := mocks.BaselineRecordStreamer(t)
-		streamer.NextFunc = func() (*uploader.BlockData, error) {
+		streamer.NextFunc = func() (*entities.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 
@@ -89,16 +98,21 @@ func TestExecution_Update(t *testing.T) {
 	t.Run("handles duplicate records", func(t *testing.T) {
 		t.Parallel()
 
+		db := helpers.InMemoryDB(t)
+		defer db.Close()
+
 		// Only keep one trie update per block to make each update call go through one block.
 		smallBlock := mocks.GenericRecord()
-		smallBlock.TrieUpdates = smallBlock.TrieUpdates[:1]
+		smallBlock.ChunkExecutionData = smallBlock.ChunkExecutionData[:1]
+
+		require.NoError(t, db.Update(operation.InsertHeader(convert.MessageToIdentifier(record.BlockId), header)))
 
 		streamer := mocks.BaselineRecordStreamer(t)
-		streamer.NextFunc = func() (*uploader.BlockData, error) {
+		streamer.NextFunc = func() (*entities.BlockExecutionData, error) {
 			return smallBlock, nil
 		}
 
-		exec := tracker.BaselineExecution(t, tracker.WithStreamer(streamer))
+		exec := tracker.BaselineExecution(t, tracker.WithStreamer(streamer), tracker.WithExecDB(db))
 
 		// The first call loads our "small block" with only one trie update and consumes it.
 		_, err := exec.Update()
@@ -114,18 +128,23 @@ func TestExecution_Update(t *testing.T) {
 
 func TestExecution_Record(t *testing.T) {
 	record := mocks.GenericRecord()
+	header := mocks.GenericHeader
 
 	t.Run("nominal case with nothing in queue", func(t *testing.T) {
 		t.Parallel()
 
+		db := helpers.InMemoryDB(t)
+		defer db.Close()
+
 		streamer := mocks.BaselineRecordStreamer(t)
-		streamer.NextFunc = func() (*uploader.BlockData, error) {
+		streamer.NextFunc = func() (*entities.BlockExecutionData, error) {
 			return record, nil
 		}
 
-		exec := tracker.BaselineExecution(t, tracker.WithStreamer(streamer))
+		require.NoError(t, db.Update(operation.InsertHeader(convert.MessageToIdentifier(record.BlockId), header)))
 
-		got, err := exec.Record(record.Block.ID())
+		exec := tracker.BaselineExecution(t, tracker.WithStreamer(streamer), tracker.WithExecDB(db))
+		got, err := exec.Record(convert.MessageToIdentifier(record.BlockId))
 
 		require.NoError(t, err)
 		assert.Equal(t, record, got)
@@ -135,13 +154,13 @@ func TestExecution_Record(t *testing.T) {
 		t.Parallel()
 
 		streamer := mocks.BaselineRecordStreamer(t)
-		streamer.NextFunc = func() (*uploader.BlockData, error) {
+		streamer.NextFunc = func() (*entities.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 
 		exec := tracker.BaselineExecution(t, tracker.WithStreamer(streamer))
 
-		_, err := exec.Record(record.Block.ID())
+		_, err := exec.Record(convert.MessageToIdentifier(record.BlockId))
 
 		assert.Error(t, err)
 	})

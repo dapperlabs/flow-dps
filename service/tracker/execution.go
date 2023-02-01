@@ -21,10 +21,12 @@ import (
 	"github.com/gammazero/deque"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	convert2 "github.com/onflow/flow-archive/models/convert"
+	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // Execution is the DPS execution follower, which keeps track of updates to the
@@ -32,10 +34,12 @@ import (
 // streamer and extracts the trie updates for consumers. It also makes the rest
 // of the block record data available for external consumers by block ID.
 type Execution struct {
-	log     zerolog.Logger
-	queue   *deque.Deque
-	stream  RecordStreamer
-	records map[flow.Identifier]*uploader.BlockData
+	log       zerolog.Logger
+	queue     *deque.Deque
+	stream    RecordStreamer
+	db        *badger.DB
+	records   map[flow.Identifier]*entities.BlockExecutionData
+	heightMap map[flow.Identifier]uint64
 }
 
 // NewExecution creates a new DPS execution follower, relying on the provided
@@ -72,34 +76,21 @@ func NewExecution(log zerolog.Logger, db *badger.DB, stream RecordStreamer) (*Ex
 	}
 
 	e := Execution{
-		log:     log.With().Str("component", "execution_tracker").Logger(),
-		stream:  stream,
-		queue:   deque.New(),
-		records: make(map[flow.Identifier]*uploader.BlockData),
+		log:       log.With().Str("component", "execution_tracker").Logger(),
+		stream:    stream,
+		queue:     deque.New(),
+		db:        db,
+		records:   make(map[flow.Identifier]*entities.BlockExecutionData),
+		heightMap: make(map[flow.Identifier]uint64),
 	}
 
-	payload := flow.Payload{
-		Guarantees: nil,
-		Seals:      nil,
-		Receipts:   nil,
-		Results:    nil,
-	}
-
-	block := flow.Block{
-		Header:  &header,
-		Payload: &payload,
-	}
-
-	record := uploader.BlockData{
-		Block:                &block,
-		Collections:          nil, // no collections
-		TxResults:            nil, // no transaction results
-		Events:               nil, // no events
-		TrieUpdates:          nil, // no trie updates
-		FinalStateCommitment: seal.FinalState,
+	record := entities.BlockExecutionData{
+		BlockId:            convert.IdentifierToMessage(blockID),
+		ChunkExecutionData: nil,
 	}
 
 	e.records[blockID] = &record
+	e.heightMap[blockID] = header.Height
 
 	return &e, nil
 }
@@ -132,13 +123,13 @@ func (e *Execution) Update() (*ledger.TrieUpdate, error) {
 // Record returns the block record for the given block ID, if it is available.
 // Once a block record is returned, all block records at a height lower than
 // the height of the returned record are purged from the cache.
-func (e *Execution) Record(blockID flow.Identifier) (*uploader.BlockData, error) {
+func (e *Execution) Record(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
 
 	// If we have the block available in the cache, let's feed it to the
 	// consumer.
 	record, ok := e.records[blockID]
 	if ok {
-		e.purge(record.Block.Header.Height)
+		e.purge(e.heightMap[blockID])
 		return record, nil
 	}
 
@@ -166,7 +157,7 @@ func (e *Execution) processNext() error {
 
 	// Check if we already processed a block with this ID recently. This should
 	// be idempotent, but we should be aware if something like this happens.
-	blockID := record.Block.Header.ID()
+	blockID := convert.MessageToIdentifier(record.BlockId)
 	_, ok := e.records[blockID]
 	if ok {
 		return fmt.Errorf("duplicate execution record (block: %x)", blockID)
@@ -175,8 +166,15 @@ func (e *Execution) processNext() error {
 	// Dump the block execution record into our cache and push all trie updates
 	// into our update queue.
 	e.records[blockID] = record
-	for _, update := range record.TrieUpdates {
-
+	var header flow.Header
+	err = e.db.View(operation.RetrieveHeader(blockID, &header))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root header: %w", err)
+	}
+	e.heightMap[blockID] = header.Height
+	recordCount := 0
+	for _, ced := range record.ChunkExecutionData {
+		update := ced.TrieUpdate
 		// The Flow execution node includes `nil` updates in the slice, instead
 		// of empty updates. We could fix this here, but we don't have the root
 		// hash to apply against, so we just skip.
@@ -184,12 +182,17 @@ func (e *Execution) processNext() error {
 			continue
 		}
 
-		e.queue.PushFront(update)
+		trieUpdate, err := convert2.MessageToTrieUpdate(ced.TrieUpdate)
+		if err != nil {
+			return fmt.Errorf("could not convert trie update: %w", err)
+		}
+		e.queue.PushFront(trieUpdate)
+		recordCount++
 	}
 
 	e.log.Debug().
 		Hex("block", blockID[:]).
-		Int("updates", len(record.TrieUpdates)).
+		Int("updates", recordCount).
 		Msg("next execution record processed")
 
 	return nil
@@ -197,9 +200,10 @@ func (e *Execution) processNext() error {
 
 // purge deletes all records that are below the specified height threshold.
 func (e *Execution) purge(threshold uint64) {
-	for blockID, record := range e.records {
-		if record.Block.Header.Height < threshold {
+	for blockID := range e.records {
+		if e.heightMap[blockID] < threshold {
 			delete(e.records, blockID)
+			delete(e.heightMap, blockID)
 		}
 	}
 }

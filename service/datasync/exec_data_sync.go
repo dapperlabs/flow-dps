@@ -5,11 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/optakt/flow-dps/models/dps"
@@ -100,7 +96,7 @@ func (e *ExecDataSync) OnBlockFinalized(block *model.Block) {
 
 // Next returns the next available block data. It returns an ErrUnavailable if no block
 // data is available at the moment.
-func (e *ExecDataSync) Next() (*uploader.BlockData, error) {
+func (e *ExecDataSync) Next() (*entities.BlockExecutionData, error) {
 
 	// If we are not polling already, we want to start polling in the
 	// background. This will try to fill the buffer up until its limit is
@@ -121,7 +117,7 @@ func (e *ExecDataSync) Next() (*uploader.BlockData, error) {
 	// concurrency safe, so there is no problem with popping from the back while
 	// the poll is pushing new items in the front.
 	record := e.buffer.PopBack()
-	return record.(*uploader.BlockData), nil
+	return record.(*entities.BlockExecutionData), nil
 }
 
 func (e *ExecDataSync) poll() {
@@ -187,52 +183,12 @@ func (e *ExecDataSync) getExecData() error {
 	}
 }
 
-func (e *ExecDataSync) pullData(ctx context.Context, blockID flow.Identifier) (*uploader.BlockData, error) {
+func (e *ExecDataSync) pullData(ctx context.Context, blockID flow.Identifier) (*entities.BlockExecutionData, error) {
 	// query AN from cached connection
 	req := &execData.GetExecutionDataByBlockIDRequest{BlockId: blockID[:]}
 	res, err := e.execDataApi.GetExecutionDataByBlockID(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return convertToBlockData(res.BlockExecutionData)
-}
-
-func convertToBlockData(data *entities.BlockExecutionData) (*uploader.BlockData, error) {
-	// convert to block exec data defined in flow-go
-	bed, err := convert.MessageToBlockExecutionData(data, flow.Mainnet.Chain())
-	if err != nil {
-		return nil, err
-	}
-
-	collections := make([]*entity.CompleteCollection, 0)
-	events := make([]*flow.Event, 0)
-	trieUpdates := make([]*ledger.TrieUpdate, 0)
-
-	for _, ced := range bed.ChunkExecutionDatas {
-		// combine the collections in the chunks
-		collectionToAdd := entity.CompleteCollection{
-			Guarantee:    nil,
-			Transactions: ced.Collection.Transactions,
-		}
-		collections = append(collections, &collectionToAdd)
-
-		// combine the events in the chunks
-		eventsToAdd := make([]*flow.Event, len(ced.Events))
-		for i := range ced.Events {
-			eventsToAdd[i] = &ced.Events[i]
-		}
-		events = append(events, eventsToAdd...)
-
-		// combine the trie updates in the chunks
-		trieUpdates = append(trieUpdates, ced.TrieUpdate)
-	}
-	blockData := uploader.BlockData{
-		Block:                nil,
-		Collections:          collections,
-		TxResults:            nil,
-		Events:               events,
-		TrieUpdates:          trieUpdates,
-		FinalStateCommitment: flow.StateCommitment{},
-	}
-	return &blockData, nil
+	return res.BlockExecutionData, nil
 }

@@ -18,8 +18,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	convert2 "github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"io"
 	"math/rand"
 	"time"
@@ -29,16 +35,13 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-go/crypto"
 	chash "github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/entity"
-
-	"github.com/onflow/flow-archive/models/archive"
 )
 
 // Offsets used to ensure different flow identifiers that do not overlap.
@@ -484,33 +487,32 @@ func GenericSeal(index int) *flow.Seal {
 	return GenericSeals(index + 1)[index]
 }
 
-func GenericRecord() *uploader.BlockData {
-	var collections []*entity.CompleteCollection
-	for _, guarantee := range GenericGuarantees(4) {
-		collections = append(collections, &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: GenericTransactions(2),
-		})
+func GenericRecord() *entities.BlockExecutionData {
+	numChunks := 5
+	ced := make([]*entities.ChunkExecutionData, numChunks)
+
+	for i := 0; i < numChunks; i++ {
+		header := unittest.BlockHeaderFixture()
+		events := unittest.BlockEventsFixture(header, 5).Events
+		tx1 := unittest.TransactionBodyFixture()
+		tx2 := unittest.TransactionBodyFixture()
+		col := &flow.Collection{Transactions: []*flow.TransactionBody{&tx1, &tx2}}
+
+		chunk := &execution_data.ChunkExecutionData{
+			Collection: col,
+			Events:     events,
+			TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		}
+		convertedChunk, err := convert2.ChunkExecutionDataToMessage(chunk)
+		if err != nil {
+			return nil
+		}
+		ced[i] = convertedChunk
 	}
 
-	var events []*flow.Event
-	for _, event := range GenericEvents(4) {
-		events = append(events, &event)
-	}
-
-	data := uploader.BlockData{
-		Block: &flow.Block{
-			Header: GenericHeader,
-			Payload: &flow.Payload{
-				Guarantees: GenericGuarantees(4),
-				Seals:      GenericSeals(4),
-			},
-		},
-		Collections:          collections,
-		TxResults:            GenericResults(4),
-		Events:               events,
-		TrieUpdates:          GenericTrieUpdates(4),
-		FinalStateCommitment: GenericCommit(0),
+	data := entities.BlockExecutionData{
+		BlockId:            convert.IdentifierToMessage(GenericHeader.ID()),
+		ChunkExecutionData: ced,
 	}
 
 	return &data

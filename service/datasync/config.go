@@ -4,13 +4,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// DefaultConfig is the default configuration for the Google Cloud Streamer.
+// DefaultConfig is the default configuration for the Streamer.
 var DefaultConfig = Config{
 	BufferSize:    32000000,
 	CatchupBlocks: []flow.Identifier{},
 }
 
-// Config is the configuration for a Google Cloud Streamer.
+// Config is the configuration for a Streamer.
 type Config struct {
 	BufferSize    uint
 	CatchupBlocks []flow.Identifier
@@ -19,8 +19,7 @@ type Config struct {
 // Option is a function that can be applied to a Config.
 type Option func(*Config)
 
-// WithBufferSize can be used to specify the buffer size for a
-// Google Cloud Streamer to use.
+// WithBufferSize can be used to specify the buffer size for a Streamer to use.
 func WithBufferSize(size uint) Option {
 	return func(cfg *Config) {
 		cfg.BufferSize = size

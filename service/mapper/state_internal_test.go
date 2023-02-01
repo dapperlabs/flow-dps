@@ -18,6 +18,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-archive/testing/mocks"
@@ -25,7 +26,7 @@ import (
 
 func TestEmptyState(t *testing.T) {
 	f := mocks.BaselineForest(t, true)
-	s := EmptyState(f)
+	s := EmptyState(f, flow.Testnet.Chain())
 
 	assert.Equal(t, f, s.forest)
 	assert.Equal(t, StatusInitialize, s.status)

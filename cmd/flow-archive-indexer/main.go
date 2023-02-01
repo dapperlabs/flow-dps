@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/prometheus/tsdb/wal"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -60,6 +61,7 @@ func run() int {
 		flagLevel      string
 		flagTrie       string
 		flagSkip       bool
+		flagChainID    string
 	)
 
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to checkpoint root file, ensure the directory contains all partitions of checkpoint files for execution state trie")
@@ -68,6 +70,7 @@ func run() int {
 	pflag.StringVarP(&flagLevel, "level", "l", "info", "log output level")
 	pflag.StringVarP(&flagTrie, "trie", "t", "", "path to data directory for execution state ledger")
 	pflag.BoolVarP(&flagSkip, "skip", "s", false, "skip indexing of execution state ledger registers")
+	pflag.StringVarP(&flagChainID, "chain-id", "", "", "identifies which network this is on")
 
 	pflag.Parse()
 
@@ -183,7 +186,7 @@ func run() int {
 		mapper.WithSkipRegisters(flagSkip),
 	)
 	forest := forest.New()
-	state := mapper.EmptyState(forest)
+	state := mapper.EmptyState(forest, flow.ChainID(flagChainID).Chain())
 	fsm := mapper.NewFSM(state,
 		mapper.WithTransition(mapper.StatusInitialize, transitions.InitializeMapper),
 		mapper.WithTransition(mapper.StatusBootstrap, transitions.BootstrapState),

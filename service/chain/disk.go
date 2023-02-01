@@ -95,7 +95,7 @@ func (d *Disk) Header(height uint64) (*flow.Header, error) {
 }
 
 // Collections retrieves the collections at the given height.
-func (d *Disk) Collections(height uint64) ([]*flow.LightCollection, error) {
+func (d *Disk) Collections(height uint64, _ flow.Chain) ([]*flow.LightCollection, error) {
 
 	blockID, err := d.block(height)
 	if err != nil {
@@ -149,7 +149,7 @@ func (d *Disk) Guarantees(height uint64) ([]*flow.CollectionGuarantee, error) {
 }
 
 // Transactions retrieves the transactions at the given height.
-func (d *Disk) Transactions(height uint64) ([]*flow.TransactionBody, error) {
+func (d *Disk) Transactions(height uint64, _ flow.Chain) ([]*flow.TransactionBody, error) {
 
 	blockID, err := d.block(height)
 	if err != nil {

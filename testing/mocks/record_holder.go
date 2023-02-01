@@ -15,48 +15,51 @@
 package mocks
 
 import (
+	"github.com/onflow/flow-go/ledger/common/testutils"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
 type RecordHolder struct {
-	RecordFunc func(blockID flow.Identifier) (*uploader.BlockData, error)
+	RecordFunc func(blockID flow.Identifier) (*entities.BlockExecutionData, error)
 }
 
 func BaselineRecordHolder(t *testing.T) *RecordHolder {
 	t.Helper()
 
 	r := RecordHolder{
-		RecordFunc: func(flow.Identifier) (*uploader.BlockData, error) {
-			var collections []*entity.CompleteCollection
-			for _, guarantee := range GenericGuarantees(4) {
-				collections = append(collections, &entity.CompleteCollection{
-					Guarantee:    guarantee,
-					Transactions: GenericTransactions(2),
-				})
+		RecordFunc: func(id flow.Identifier) (*entities.BlockExecutionData, error) {
+			numChunks := 5
+			ced := make([]*entities.ChunkExecutionData, numChunks)
+
+			for i := 0; i < numChunks; i++ {
+				header := unittest.BlockHeaderFixture()
+				events := unittest.BlockEventsFixture(header, 5).Events
+				tx1 := unittest.TransactionBodyFixture()
+				tx2 := unittest.TransactionBodyFixture()
+				col := &flow.Collection{Transactions: []*flow.TransactionBody{&tx1, &tx2}}
+
+				chunk := &execution_data.ChunkExecutionData{
+					Collection: col,
+					Events:     events,
+					TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+				}
+				convertedChunk, err := convert.ChunkExecutionDataToMessage(chunk)
+				if err != nil {
+					return nil, err
+				}
+				ced[i] = convertedChunk
 			}
 
-			var events []*flow.Event
-			for _, event := range GenericEvents(4) {
-				events = append(events, &event)
-			}
-
-			data := uploader.BlockData{
-				Block: &flow.Block{
-					Header: GenericHeader,
-					Payload: &flow.Payload{
-						Guarantees: GenericGuarantees(4),
-						Seals:      GenericSeals(4),
-					},
-				},
-				Collections:          collections,
-				TxResults:            GenericResults(4),
-				Events:               events,
-				TrieUpdates:          GenericTrieUpdates(4),
-				FinalStateCommitment: GenericCommit(0),
+			data := entities.BlockExecutionData{
+				BlockId:            convert.IdentifierToMessage(id),
+				ChunkExecutionData: ced,
 			}
 
 			return &data, nil
@@ -66,6 +69,6 @@ func BaselineRecordHolder(t *testing.T) *RecordHolder {
 	return &r
 }
 
-func (r *RecordHolder) Record(blockID flow.Identifier) (*uploader.BlockData, error) {
+func (r *RecordHolder) Record(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
 	return r.RecordFunc(blockID)
 }

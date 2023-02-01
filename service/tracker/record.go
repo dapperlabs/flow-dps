@@ -15,17 +15,17 @@
 package tracker
 
 import (
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // RecordStreamer represents something that can stream block data.
 type RecordStreamer interface {
-	Next() (*uploader.BlockData, error)
+	Next() (*entities.BlockExecutionData, error)
 }
 
 // RecordHolder represents something that can be used to request
 // block data for a specific block identifier.
 type RecordHolder interface {
-	Record(blockID flow.Identifier) (*uploader.BlockData, error)
+	Record(blockID flow.Identifier) (*entities.BlockExecutionData, error)
 }

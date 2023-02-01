@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"github.com/onflow/flow-archive/service/datasync"
 	"net"
 	"net/http"
 	"os"
@@ -41,10 +40,12 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	unstaked "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 
 	api "github.com/onflow/flow-archive/api/archive"
 	"github.com/onflow/flow-archive/codec/zbor"
 	"github.com/onflow/flow-archive/models/archive"
+	"github.com/onflow/flow-archive/service/datasync"
 	"github.com/onflow/flow-archive/service/forest"
 	"github.com/onflow/flow-archive/service/index"
 	"github.com/onflow/flow-archive/service/initializer"
@@ -88,6 +89,7 @@ func run() int {
 		flagSeedAddress   string
 		flagSeedKey       string
 		flagTracing       bool
+		flagChainID       string
 	)
 
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving Archive API")
@@ -105,6 +107,7 @@ func run() int {
 	pflag.StringVar(&flagSeedAddress, "seed-address", "", "host address of seed node to follow consensus")
 	pflag.StringVar(&flagSeedKey, "seed-key", "", "hex-encoded public network key of seed node to follow consensus")
 	pflag.BoolVarP(&flagTracing, "tracing", "t", false, "enable tracing for this instance")
+	pflag.StringVarP(&flagChainID, "chain-id", "", "", "identifies which network this is on")
 
 	pflag.Parse()
 
@@ -330,7 +333,7 @@ func run() int {
 		mapper.WithSkipRegisters(flagSkip),
 	)
 	forest := forest.New()
-	state := mapper.EmptyState(forest)
+	state := mapper.EmptyState(forest, flow.ChainID(flagChainID).Chain())
 	fsm := mapper.NewFSM(state,
 		mapper.WithTransition(mapper.StatusInitialize, transitions.InitializeMapper),
 		mapper.WithTransition(mapper.StatusBootstrap, transitions.BootstrapState),

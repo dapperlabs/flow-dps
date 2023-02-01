@@ -135,12 +135,12 @@ func TestTransitions_IndexChain(t *testing.T) {
 
 			return mocks.GenericHeader, nil
 		}
-		chain.CommitFunc = func(height uint64) (flow.StateCommitment, error) {
-			assert.Equal(t, mocks.GenericHeight, height)
-
-			return mocks.GenericCommit(0), nil
-		}
-		chain.CollectionsFunc = func(height uint64) ([]*flow.LightCollection, error) {
+		//chain.CommitFunc = func(height uint64) (flow.StateCommitment, error) {
+		//	assert.Equal(t, mocks.GenericHeight, height)
+		//
+		//	return mocks.GenericCommit(0), nil
+		//}
+		chain.CollectionsFunc = func(height uint64, chain flow.Chain) ([]*flow.LightCollection, error) {
 			assert.Equal(t, mocks.GenericHeight, height)
 
 			return mocks.GenericCollections(2), nil
@@ -150,16 +150,16 @@ func TestTransitions_IndexChain(t *testing.T) {
 
 			return mocks.GenericGuarantees(2), nil
 		}
-		chain.TransactionsFunc = func(height uint64) ([]*flow.TransactionBody, error) {
+		chain.TransactionsFunc = func(height uint64, chain flow.Chain) ([]*flow.TransactionBody, error) {
 			assert.Equal(t, mocks.GenericHeight, height)
 
 			return mocks.GenericTransactions(4), nil
 		}
-		chain.ResultsFunc = func(height uint64) ([]*flow.TransactionResult, error) {
-			assert.Equal(t, mocks.GenericHeight, height)
-
-			return mocks.GenericResults(4), nil
-		}
+		//chain.ResultsFunc = func(height uint64) ([]*flow.TransactionResult, error) {
+		//	assert.Equal(t, mocks.GenericHeight, height)
+		//
+		//	return mocks.GenericResults(4), nil
+		//}
 		chain.EventsFunc = func(height uint64) ([]flow.Event, error) {
 			assert.Equal(t, mocks.GenericHeight, height)
 
@@ -246,37 +246,38 @@ func TestTransitions_IndexChain(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("handles chain failure to retrieve commit", func(t *testing.T) {
-		t.Parallel()
-
-		chain := mocks.BaselineChain(t)
-		chain.CommitFunc = func(uint64) (flow.StateCommitment, error) {
-			return flow.DummyStateCommitment, mocks.GenericError
-		}
-
-		tr, st := baselineFSM(t, StatusIndex)
-		tr.chain = chain
-
-		err := tr.IndexChain(st)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles writer failure to index commit", func(t *testing.T) {
-		t.Parallel()
-
-		write := mocks.BaselineWriter(t)
-		write.CommitFunc = func(uint64, flow.StateCommitment) error {
-			return mocks.GenericError
-		}
-
-		tr, st := baselineFSM(t, StatusIndex)
-		tr.write = write
-
-		err := tr.IndexChain(st)
-
-		assert.Error(t, err)
-	})
+	// TODO: Re-enable when commit implemented
+	//t.Run("handles chain failure to retrieve commit", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	chain := mocks.BaselineChain(t)
+	//	chain.CommitFunc = func(uint64) (flow.StateCommitment, error) {
+	//		return flow.DummyStateCommitment, mocks.GenericError
+	//	}
+	//
+	//	tr, st := baselineFSM(t, StatusIndex)
+	//	tr.chain = chain
+	//
+	//	err := tr.IndexChain(st)
+	//
+	//	assert.Error(t, err)
+	//})
+	//
+	//t.Run("handles writer failure to index commit", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	write := mocks.BaselineWriter(t)
+	//	write.CommitFunc = func(uint64, flow.StateCommitment) error {
+	//		return mocks.GenericError
+	//	}
+	//
+	//	tr, st := baselineFSM(t, StatusIndex)
+	//	tr.write = write
+	//
+	//	err := tr.IndexChain(st)
+	//
+	//	assert.Error(t, err)
+	//})
 
 	t.Run("handles chain failure to retrieve header", func(t *testing.T) {
 		t.Parallel()
@@ -314,7 +315,7 @@ func TestTransitions_IndexChain(t *testing.T) {
 		t.Parallel()
 
 		chain := mocks.BaselineChain(t)
-		chain.TransactionsFunc = func(uint64) ([]*flow.TransactionBody, error) {
+		chain.TransactionsFunc = func(uint64, flow.Chain) ([]*flow.TransactionBody, error) {
 			return nil, mocks.GenericError
 		}
 
@@ -326,43 +327,44 @@ func TestTransitions_IndexChain(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("handles chain failure to retrieve transaction results", func(t *testing.T) {
-		t.Parallel()
-
-		chain := mocks.BaselineChain(t)
-		chain.ResultsFunc = func(uint64) ([]*flow.TransactionResult, error) {
-			return nil, mocks.GenericError
-		}
-
-		tr, st := baselineFSM(t, StatusIndex)
-		tr.chain = chain
-
-		err := tr.IndexChain(st)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles writer failure to index transactions", func(t *testing.T) {
-		t.Parallel()
-
-		write := mocks.BaselineWriter(t)
-		write.ResultsFunc = func([]*flow.TransactionResult) error {
-			return mocks.GenericError
-		}
-
-		tr, st := baselineFSM(t, StatusIndex)
-		tr.write = write
-
-		err := tr.IndexChain(st)
-
-		assert.Error(t, err)
-	})
+	// TODO: Re-enable when results implemented
+	//t.Run("handles chain failure to retrieve transaction results", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	chain := mocks.BaselineChain(t)
+	//	chain.ResultsFunc = func(uint64) ([]*flow.TransactionResult, error) {
+	//		return nil, mocks.GenericError
+	//	}
+	//
+	//	tr, st := baselineFSM(t, StatusIndex)
+	//	tr.chain = chain
+	//
+	//	err := tr.IndexChain(st)
+	//
+	//	assert.Error(t, err)
+	//})
+	//
+	//t.Run("handles writer failure to index transactions", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	write := mocks.BaselineWriter(t)
+	//	write.ResultsFunc = func([]*flow.TransactionResult) error {
+	//		return mocks.GenericError
+	//	}
+	//
+	//	tr, st := baselineFSM(t, StatusIndex)
+	//	tr.write = write
+	//
+	//	err := tr.IndexChain(st)
+	//
+	//	assert.Error(t, err)
+	//})
 
 	t.Run("handles chain failure to retrieve collections", func(t *testing.T) {
 		t.Parallel()
 
 		chain := mocks.BaselineChain(t)
-		chain.CollectionsFunc = func(uint64) ([]*flow.LightCollection, error) {
+		chain.CollectionsFunc = func(uint64, flow.Chain) ([]*flow.LightCollection, error) {
 			return nil, mocks.GenericError
 		}
 

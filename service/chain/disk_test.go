@@ -15,6 +15,7 @@
 package chain_test
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"math"
 	"testing"
 
@@ -219,12 +220,12 @@ func TestDisk_Collections(t *testing.T) {
 
 		c := chain.FromDisk(db)
 
-		tt, err := c.Collections(mocks.GenericHeight)
+		tt, err := c.Collections(mocks.GenericHeight, flow.Testnet.Chain())
 
 		require.NoError(t, err)
 		assert.Len(t, tt, 2)
 
-		_, err = c.Collections(math.MaxUint64)
+		_, err = c.Collections(math.MaxUint64, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -239,7 +240,7 @@ func TestDisk_Collections(t *testing.T) {
 
 		c := chain.FromDisk(db)
 
-		_, err := c.Collections(mocks.GenericHeight)
+		_, err := c.Collections(mocks.GenericHeight, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -252,7 +253,7 @@ func TestDisk_Collections(t *testing.T) {
 
 		c := chain.FromDisk(db)
 
-		_, err := c.Collections(mocks.GenericHeight)
+		_, err := c.Collections(mocks.GenericHeight, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -329,12 +330,12 @@ func TestDisk_Transactions(t *testing.T) {
 
 		c := chain.FromDisk(db)
 
-		tt, err := c.Transactions(mocks.GenericHeight)
+		tt, err := c.Transactions(mocks.GenericHeight, flow.Testnet.Chain())
 
 		require.NoError(t, err)
 		assert.Len(t, tt, 4)
 
-		_, err = c.Transactions(math.MaxUint64)
+		_, err = c.Transactions(math.MaxUint64, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -349,7 +350,7 @@ func TestDisk_Transactions(t *testing.T) {
 
 		c := chain.FromDisk(db)
 
-		_, err := c.Transactions(mocks.GenericHeight)
+		_, err := c.Transactions(mocks.GenericHeight, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})
@@ -362,7 +363,7 @@ func TestDisk_Transactions(t *testing.T) {
 
 		c := chain.FromDisk(db)
 
-		_, err := c.Transactions(mocks.GenericHeight)
+		_, err := c.Transactions(mocks.GenericHeight, flow.Testnet.Chain())
 
 		assert.Error(t, err)
 	})

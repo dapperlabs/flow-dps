@@ -17,12 +17,14 @@ package tracker
 import (
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/gammazero/deque"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
 
@@ -141,75 +143,113 @@ func TestNewExecution(t *testing.T) {
 }
 
 func TestExecution_Purge(t *testing.T) {
-	blocks := []*uploader.BlockData{
-		{Block: &flow.Block{Header: &flow.Header{Height: 4}}},
-		{Block: &flow.Block{Header: &flow.Header{Height: 5}}},
-		{Block: &flow.Block{Header: &flow.Header{Height: 6}}},
-		{Block: &flow.Block{Header: &flow.Header{Height: 7}}},
+	//blocks := []*entities.BlockExecutionData{
+	//	{Block: &flow.Block{Header: &flow.Header{Height: 4}}},
+	//	{Block: &flow.Block{Header: &flow.Header{Height: 5}}},
+	//	{Block: &flow.Block{Header: &flow.Header{Height: 6}}},
+	//	{Block: &flow.Block{Header: &flow.Header{Height: 7}}},
+	//}
+
+	blockIDs := mocks.GenericBlockIDs(4)
+	blocks := []*entities.BlockExecutionData{
+		{BlockId: convert.IdentifierToMessage(blockIDs[0]), ChunkExecutionData: nil},
+		{BlockId: convert.IdentifierToMessage(blockIDs[1]), ChunkExecutionData: nil},
+		{BlockId: convert.IdentifierToMessage(blockIDs[2]), ChunkExecutionData: nil},
+		{BlockId: convert.IdentifierToMessage(blockIDs[3]), ChunkExecutionData: nil},
 	}
+	blockHeights := []uint64{4, 5, 6, 7}
 
 	tests := []struct {
 		name string
 
-		threshold uint64
-		before    map[flow.Identifier]*uploader.BlockData
+		threshold    uint64
+		before       map[flow.Identifier]*entities.BlockExecutionData
+		heightBefore map[flow.Identifier]uint64
 
-		after map[flow.Identifier]*uploader.BlockData
+		after       map[flow.Identifier]*entities.BlockExecutionData
+		heightAfter map[flow.Identifier]uint64
 	}{
 		{
 			name: "threshold is at lowest height",
 
-			threshold: blocks[0].Block.Header.Height,
-			before: map[flow.Identifier]*uploader.BlockData{
-				blocks[0].Block.ID(): blocks[0],
-				blocks[1].Block.ID(): blocks[1],
-				blocks[2].Block.ID(): blocks[2],
-				blocks[3].Block.ID(): blocks[3],
+			threshold: blockHeights[0],
+			before: map[flow.Identifier]*entities.BlockExecutionData{
+				blockIDs[0]: blocks[0],
+				blockIDs[1]: blocks[1],
+				blockIDs[2]: blocks[2],
+				blockIDs[3]: blocks[3],
 			},
-
-			after: map[flow.Identifier]*uploader.BlockData{
-				blocks[0].Block.ID(): blocks[0],
-				blocks[1].Block.ID(): blocks[1],
-				blocks[2].Block.ID(): blocks[2],
-				blocks[3].Block.ID(): blocks[3],
+			heightBefore: map[flow.Identifier]uint64{
+				blockIDs[0]: blockHeights[0],
+				blockIDs[1]: blockHeights[1],
+				blockIDs[2]: blockHeights[2],
+				blockIDs[3]: blockHeights[3],
+			},
+			after: map[flow.Identifier]*entities.BlockExecutionData{
+				blockIDs[0]: blocks[0],
+				blockIDs[1]: blocks[1],
+				blockIDs[2]: blocks[2],
+				blockIDs[3]: blocks[3],
+			},
+			heightAfter: map[flow.Identifier]uint64{
+				blockIDs[0]: blockHeights[0],
+				blockIDs[1]: blockHeights[1],
+				blockIDs[2]: blockHeights[2],
+				blockIDs[3]: blockHeights[3],
 			},
 		},
 		{
 			name: "threshold is above highest height",
 
-			threshold: blocks[3].Block.Header.Height + 1,
-			before: map[flow.Identifier]*uploader.BlockData{
-				blocks[0].Block.ID(): blocks[0],
-				blocks[1].Block.ID(): blocks[1],
-				blocks[2].Block.ID(): blocks[2],
-				blocks[3].Block.ID(): blocks[3],
+			threshold: blockHeights[3] + 1,
+			before: map[flow.Identifier]*entities.BlockExecutionData{
+				blockIDs[0]: blocks[0],
+				blockIDs[1]: blocks[1],
+				blockIDs[2]: blocks[2],
+				blockIDs[3]: blocks[3],
 			},
-
-			after: map[flow.Identifier]*uploader.BlockData{},
+			heightBefore: map[flow.Identifier]uint64{
+				blockIDs[0]: blockHeights[0],
+				blockIDs[1]: blockHeights[1],
+				blockIDs[2]: blockHeights[2],
+				blockIDs[3]: blockHeights[3],
+			},
+			after:       map[flow.Identifier]*entities.BlockExecutionData{},
+			heightAfter: map[flow.Identifier]uint64{},
 		},
 		{
 			name: "threshold is in-between",
 
-			threshold: blocks[2].Block.Header.Height,
-			before: map[flow.Identifier]*uploader.BlockData{
-				blocks[0].Block.ID(): blocks[0],
-				blocks[1].Block.ID(): blocks[1],
-				blocks[2].Block.ID(): blocks[2],
-				blocks[3].Block.ID(): blocks[3],
+			threshold: blockHeights[2],
+			before: map[flow.Identifier]*entities.BlockExecutionData{
+				blockIDs[0]: blocks[0],
+				blockIDs[1]: blocks[1],
+				blockIDs[2]: blocks[2],
+				blockIDs[3]: blocks[3],
 			},
-
-			after: map[flow.Identifier]*uploader.BlockData{
-				blocks[2].Block.ID(): blocks[2],
-				blocks[3].Block.ID(): blocks[3],
+			heightBefore: map[flow.Identifier]uint64{
+				blockIDs[0]: blockHeights[0],
+				blockIDs[1]: blockHeights[1],
+				blockIDs[2]: blockHeights[2],
+				blockIDs[3]: blockHeights[3],
+			},
+			after: map[flow.Identifier]*entities.BlockExecutionData{
+				blockIDs[2]: blocks[2],
+				blockIDs[3]: blocks[3],
+			},
+			heightAfter: map[flow.Identifier]uint64{
+				blockIDs[2]: blockHeights[2],
+				blockIDs[3]: blockHeights[3],
 			},
 		},
 		{
 			name: "does nothing when there is nothing to purge",
 
-			threshold: blocks[2].Block.Header.Height,
-			before:    map[flow.Identifier]*uploader.BlockData{},
-
-			after: map[flow.Identifier]*uploader.BlockData{},
+			threshold:    blockHeights[2],
+			before:       map[flow.Identifier]*entities.BlockExecutionData{},
+			heightBefore: map[flow.Identifier]uint64{},
+			after:        map[flow.Identifier]*entities.BlockExecutionData{},
+			heightAfter:  map[flow.Identifier]uint64{},
 		},
 	}
 
@@ -221,10 +261,12 @@ func TestExecution_Purge(t *testing.T) {
 
 			exec := BaselineExecution(t)
 			exec.records = test.before
+			exec.heightMap = test.heightBefore
 
 			exec.purge(test.threshold)
 
 			assert.Len(t, exec.records, len(test.after))
+			assert.Len(t, exec.heightMap, len(test.heightAfter))
 			assert.Equal(t, test.after, exec.records)
 		})
 	}
@@ -235,10 +277,11 @@ func BaselineExecution(t *testing.T, opts ...func(*Execution)) *Execution {
 	t.Helper()
 
 	e := Execution{
-		log:     zerolog.Nop(),
-		queue:   deque.New(),
-		stream:  mocks.BaselineRecordStreamer(t),
-		records: make(map[flow.Identifier]*uploader.BlockData),
+		log:       zerolog.Nop(),
+		queue:     deque.New(),
+		stream:    mocks.BaselineRecordStreamer(t),
+		records:   make(map[flow.Identifier]*entities.BlockExecutionData),
+		heightMap: make(map[flow.Identifier]uint64),
 	}
 
 	for _, opt := range opts {
@@ -257,5 +300,11 @@ func WithStreamer(stream RecordStreamer) func(*Execution) {
 func WithQueue(queue *deque.Deque) func(*Execution) {
 	return func(execution *Execution) {
 		execution.queue = queue
+	}
+}
+
+func WithExecDB(db *badger.DB) func(*Execution) {
+	return func(execution *Execution) {
+		execution.db = db
 	}
 }
