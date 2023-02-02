@@ -15,6 +15,7 @@
 package tracker
 
 import (
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"testing"
 
 	"github.com/gammazero/deque"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/koko1123/flow-go-1/model/flow"
 	"github.com/koko1123/flow-go-1/storage/badger/operation"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-archive/testing/helpers"
 	"github.com/onflow/flow-archive/testing/mocks"

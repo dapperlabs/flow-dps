@@ -204,7 +204,7 @@ func run() int {
 
 	// Signal catching for clean shutdown.
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig)
 
 	// Command line parameter initialization.
 	var (

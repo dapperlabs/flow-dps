@@ -15,6 +15,7 @@
 package tracker_test
 
 import (
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,6 @@ import (
 
 	"github.com/koko1123/flow-go-1/model/flow"
 	"github.com/koko1123/flow-go-1/storage/badger/operation"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-archive/service/tracker"
 	"github.com/onflow/flow-archive/testing/helpers"

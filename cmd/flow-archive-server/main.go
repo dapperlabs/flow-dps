@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/dgraph-io/badger/v3"
@@ -52,7 +53,7 @@ func run() int {
 
 	// Signal catching for clean shutdown.
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig, syscall.SIGINT)
 
 	// Command line parameter initialization.
 	var (

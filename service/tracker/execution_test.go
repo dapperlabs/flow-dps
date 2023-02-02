@@ -15,13 +15,12 @@
 package tracker_test
 
 import (
+	"github.com/koko1123/flow-go-1/engine/execution/ingestion/uploader"
 	"testing"
 
 	"github.com/gammazero/deque"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-archive/service/tracker"
 	"github.com/onflow/flow-archive/testing/mocks"
