@@ -174,7 +174,6 @@ github.com/btcsuite/btcd v0.21.0-beta/go.mod h1:ZSWyehm27aAuS9bvkATT+Xte3hjHZ+MR
 github.com/btcsuite/btcd v0.22.1 h1:CnwP9LM/M9xuRrGSCGeMVs9iv09uMqwsVX7EeIpgV2c=
 github.com/btcsuite/btcd v0.22.1/go.mod h1:wqgTSL29+50LRkmOVknEdmt8ZojIzhuWvgu/iptuN7Y=
 github.com/btcsuite/btcd/btcec/v2 v2.2.1 h1:xP60mv8fvp+0khmrN0zTdPC3cNm24rfeE6lh2R/Yv3E=
-github.com/btcsuite/btcd/btcec/v2 v2.2.1/go.mod h1:9/CSmJxmuvqzX9Wh2fXMWToLOHhPd11lSPuIupwTkI8=
 github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 h1:q0rUy8C/TYNBQS1+CGKw68tLOFYSNEs0TFnxxnS9+4U=
 github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f/go.mod h1:TdznJufoqS23FtqVCzL0ZqgP5MqXbb4fg/WgDys70nA=
 github.com/btcsuite/btcutil v0.0.0-20190207003914-4c204d697803/go.mod h1:+5NJ2+qvTyV9exUAL/rxXi3DcLg2Ts+ymUAY5y4NvMg=
@@ -1218,14 +1217,10 @@ github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221216161720-
 github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221216161720-c1b31d5a4722/go.mod h1:WMmeggH/H9Xb/SsT+4QFMtGYf+p1S2LXzbZAIaQQWAk=
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0 h1:Cg4gHGVblxcejfNNG5Mfj98Wf4zbY76O0Y28QB0766A=
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0/go.mod h1:1zoTjp1KzNnOPkyqKmWKerUyf0gciw+e6tAEt0Ks3JE=
-github.com/onflow/flow-go v0.29.0 h1:jefrDJSd3BQyM9Xh2g3aTlChkECOc+6TD3SGjYtr2J0=
-github.com/onflow/flow-go v0.29.0/go.mod h1:LJz5jkFKIKHJwBAXKAfgDB9JqesJC6Bq7BarRYyzaPI=
 github.com/onflow/flow-go-sdk v0.31.3 h1:CytMRiTayXRlkRNXQ9Cw6ZcKoOIK6+QtXk4iUb8f0zQ=
 github.com/onflow/flow-go-sdk v0.31.3/go.mod h1:cqj2QShwC4DqxWzrg0+U7KxE2k7OJDGBxh8XZrJ4v5E=
 github.com/onflow/flow-go/crypto v0.24.4 h1:SwEtoVS2TidCIHYCZMgQ7U2YsqhI9upnw94fhdHTubM=
 github.com/onflow/flow-go/crypto v0.24.4/go.mod h1:dkVL98P6GHR48iD9zCB6XlnkJX8IQd00FKgt1reV90w=
-github.com/onflow/flow-go/crypto v0.24.6 h1:krts+8LJa7GvOURjHibV95CLpDZg+cyJTrTOWhb2zrw=
-github.com/onflow/flow-go/crypto v0.24.6/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 h1:haWv3D5loiH+zcOoWEvDXtWQvXt5U8PLliQjwhv9sfw=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 h1:XcSR/n2aSVO7lOEsKScYALcpHlfowLwicZ9yVbL6bnA=

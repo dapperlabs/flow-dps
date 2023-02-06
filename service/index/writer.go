@@ -56,11 +56,13 @@ func NewWriter(db *badger.DB, lib archive.WriteLibrary, options ...func(*Config)
 		option(&cfg)
 	}
 
+	txn := db.NewTransaction(true)
+
 	w := Writer{
 		db:   db,
 		lib:  lib,
 		cfg:  cfg,
-		tx:   &badger.Txn{},
+		tx:   txn,
 		sema: semaphore.NewWeighted(int64(cfg.ConcurrentTransactions)),
 		err:  make(chan error, cfg.ConcurrentTransactions),
 
