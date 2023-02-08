@@ -31,7 +31,6 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/koko1123/flow-go-1 v0.29.6-upgrade-to-badger-v3.0.20230131060215-c8d5a186ad74
 	github.com/onflow/flow-go/crypto v0.24.4
-	github.com/optakt/flow-dps-rosetta v1.0.0
 	github.com/srikrsna/protoc-gen-gotag v0.6.2
 	go.opentelemetry.io/otel v1.11.1
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.8.0
