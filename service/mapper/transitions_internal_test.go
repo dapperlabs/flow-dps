@@ -514,56 +514,8 @@ func TestTransitions_UpdateTree(t *testing.T) {
 		err := tr.UpdateTree(st)
 
 		require.NoError(t, err)
-		assert.Equal(t, StatusUpdate, st.status)
-	})
-
-	t.Run("nominal case with no available update temporarily", func(t *testing.T) {
-		t.Parallel()
-
-		tr, st := baselineFSM(t, StatusUpdate)
-
-		// Set up the mock feeder to return an unavailable error on the first call and return successfully
-		// to subsequent calls.
-		var updateCalled bool
-		feeder := mocks.BaselineFeeder(t)
-		feeder.UpdateFunc = func() (*ledger.TrieUpdate, error) {
-			if !updateCalled {
-				updateCalled = true
-				return nil, archive.ErrUnavailable
-			}
-			return mocks.GenericTrieUpdate(0), nil
-		}
-		tr.feed = feeder
-
-		forest := mocks.BaselineForest(t, true)
-		forest.HasFunc = func(flow.StateCommitment) bool {
-			return updateCalled
-		}
-		st.forest = forest
-
-		// The first call should not error but should not change the status of the FSM to updating. It should
-		// instead remain Updating until a match is found.
-		err := tr.UpdateTree(st)
-
-		require.NoError(t, err)
-		assert.Equal(t, StatusUpdate, st.status)
-
-		// The second call is now successful and matches.
-		err = tr.UpdateTree(st)
-
-		require.NoError(t, err)
-		assert.Equal(t, StatusCollect, st.status)
-	})
-
-	t.Run("nominal case with match", func(t *testing.T) {
-		t.Parallel()
-
-		tr, st := baselineFSM(t, StatusUpdate)
-
-		err := tr.UpdateTree(st)
-
-		require.NoError(t, err)
-		assert.Equal(t, StatusCollect, st.status)
+		// Should update registers and proceed to map step
+		assert.Equal(t, StatusMap, st.status)
 	})
 
 	t.Run("handles invalid status", func(t *testing.T) {
@@ -584,7 +536,12 @@ func TestTransitions_UpdateTree(t *testing.T) {
 			return nil, mocks.GenericError
 		}
 
-		tr, st := baselineFSM(t, StatusUpdate)
+		reader := mocks.BaselineReader(t)
+		reader.PathsByHeightFunc = func(height uint64) ([]ledger.Path, error) {
+			return nil, mocks.GenericError
+		}
+		tr, st := baselineFSM(t, StatusUpdate, withReader(reader))
+
 		st.forest = mocks.BaselineForest(t, false)
 		tr.feed = feed
 
@@ -607,66 +564,6 @@ func TestTransitions_UpdateTree(t *testing.T) {
 		err := tr.UpdateTree(st)
 
 		assert.NoError(t, err)
-	})
-}
-
-func TestTransitions_CollectRegisters(t *testing.T) {
-	t.Run("nominal case", func(t *testing.T) {
-		t.Parallel()
-
-		forest := mocks.BaselineForest(t, true)
-		forest.ParentFunc = func(commit flow.StateCommitment) (flow.StateCommitment, bool) {
-			assert.Equal(t, mocks.GenericCommit(0), commit)
-
-			return mocks.GenericCommit(1), true
-		}
-
-		tr, st := baselineFSM(t, StatusCollect)
-		st.forest = forest
-
-		err := tr.CollectRegisters(st)
-
-		require.NoError(t, err)
-		assert.Equal(t, StatusMap, st.status)
-		for _, wantPath := range mocks.GenericLedgerPaths(6) {
-			assert.Contains(t, st.registers, wantPath)
-		}
-	})
-
-	t.Run("indexing payloads disabled", func(t *testing.T) {
-		t.Parallel()
-
-		tr, st := baselineFSM(t, StatusCollect)
-		tr.cfg.SkipRegisters = true
-
-		err := tr.CollectRegisters(st)
-
-		require.NoError(t, err)
-		assert.Empty(t, st.registers)
-		assert.Equal(t, StatusForward, st.status)
-	})
-
-	t.Run("handles invalid status", func(t *testing.T) {
-		t.Parallel()
-
-		tr, st := baselineFSM(t, StatusBootstrap)
-
-		err := tr.CollectRegisters(st)
-
-		assert.Error(t, err)
-		assert.Empty(t, st.registers)
-	})
-
-	t.Run("handles missing tree for commit", func(t *testing.T) {
-		t.Parallel()
-
-		tr, st := baselineFSM(t, StatusCollect)
-		st.forest = mocks.BaselineForest(t, false)
-
-		err := tr.CollectRegisters(st)
-
-		assert.Error(t, err)
-		assert.Empty(t, st.registers)
 	})
 }
 
@@ -941,8 +838,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, StatusIndex, st.status)
 		assert.Equal(t, header.Height+1, st.height)
-		assert.Equal(t, flow.DummyStateCommitment, st.last)
-		assert.Equal(t, commit, st.next)
 	})
 
 	t.Run("handles chain failure on Root", func(t *testing.T) {
@@ -1226,8 +1121,6 @@ func baselineFSM(t *testing.T, status Status, opts ...func(tr *Transitions)) (*T
 		forest:    forest,
 		status:    status,
 		height:    mocks.GenericHeight,
-		last:      mocks.GenericCommit(1),
-		next:      mocks.GenericCommit(0),
 		registers: make(map[ledger.Path]*ledger.Payload),
 		done:      doneCh,
 	}

@@ -26,8 +26,6 @@ type State struct {
 	forest    Forest
 	status    Status
 	height    uint64
-	last      flow.StateCommitment
-	next      flow.StateCommitment
 	registers map[ledger.Path]*ledger.Payload
 	done      chan struct{}
 	chain     flow.Chain
@@ -40,8 +38,6 @@ func EmptyState(forest Forest, chain flow.Chain) *State {
 		forest:    forest,
 		status:    StatusInitialize,
 		height:    math.MaxUint64,
-		last:      flow.DummyStateCommitment,
-		next:      flow.DummyStateCommitment,
 		registers: make(map[ledger.Path]*ledger.Payload),
 		done:      make(chan struct{}),
 		chain:     chain,

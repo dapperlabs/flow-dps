@@ -229,3 +229,10 @@ func (r *Reader) SealsByHeight(height uint64) ([]flow.Identifier, error) {
 	err := r.db.View(r.lib.LookupSealsForHeight(height, &sealIDs))
 	return sealIDs, err
 }
+
+// PathsByHeight returns all of the payload paths that were part of the finalized block at the given height
+func (r *Reader) PathsByHeight(height uint64) ([]ledger.Path, error) {
+	var paths []ledger.Path
+	err := r.db.View(r.lib.LookupPayloadPathsForHeight(height, &paths))
+	return paths, err
+}

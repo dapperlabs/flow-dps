@@ -31,8 +31,6 @@ func TestEmptyState(t *testing.T) {
 	assert.Equal(t, f, s.forest)
 	assert.Equal(t, StatusInitialize, s.status)
 	assert.Equal(t, s.height, uint64(math.MaxUint64))
-	assert.Zero(t, s.last)
-	assert.Zero(t, s.next)
 	assert.NotNil(t, s.registers)
 	assert.Empty(t, s.registers)
 	assert.NotNil(t, s.done)

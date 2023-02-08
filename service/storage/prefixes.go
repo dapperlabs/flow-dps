@@ -35,6 +35,7 @@ const (
 	PrefixCollectionsForHeight      = 11
 	PrefixResults                   = 13
 
-	PrefixSeal           = 14
-	PrefixSealsForHeight = 15
+	PrefixSeal                  = 14
+	PrefixSealsForHeight        = 15
+	PrefixPayloadPathsForHeight = 16
 )

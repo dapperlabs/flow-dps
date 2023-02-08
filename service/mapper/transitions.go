@@ -97,14 +97,6 @@ func (t *Transitions) BootstrapState(s *State) error {
 	empty := trie.NewEmptyMTrie()
 	s.forest.Save(empty, nil, flow.DummyStateCommitment)
 
-	// The chain indexing will forward last to next and next to current height,
-	// which will be the one for the checkpoint.
-	first := flow.StateCommitment(empty.RootHash())
-	s.last = flow.DummyStateCommitment
-	s.next = first
-
-	t.log.Info().Hex("commit", first[:]).Msg("added empty tree to forest")
-
 	// Then, we can load the root height and apply it to the state. That
 	// will allow us to load the root blockchain data in the next step.
 	height, err := t.chain.Root()
@@ -112,18 +104,6 @@ func (t *Transitions) BootstrapState(s *State) error {
 		return fmt.Errorf("could not get root height: %w", err)
 	}
 	s.height = height
-
-	// When bootstrapping, the loader injected into the mapper loads the root
-	// checkpoint.
-	tree, err := t.load.Trie()
-	if err != nil {
-		return fmt.Errorf("could not load root trie: %w", err)
-	}
-	paths := allPaths(tree)
-	s.forest.Save(tree, paths, first)
-
-	second := tree.RootHash()
-	t.log.Info().Uint64("height", s.height).Hex("commit", second[:]).Int("registers", len(paths)).Msg("added checkpoint tree to forest")
 
 	// We have successfully bootstrapped. However, no chain data for the root
 	// block has been indexed yet. This is why we "pretend" that we just
@@ -180,13 +160,6 @@ func (t *Transitions) ResumeIndexing(s *State) error {
 	if hash != commit {
 		return fmt.Errorf("restored trie hash does not match last commit (hash: %x, commit: %x)", hash, commit)
 	}
-
-	// At this point, we can store the restored trie in our forest, as the trie
-	// for the last finalized block. We do not need to care about the parent
-	// state commitment or the paths, as they should not be used.
-	s.last = flow.DummyStateCommitment
-	s.next = commit
-	s.forest.Save(tree, nil, flow.DummyStateCommitment)
 
 	// Lastly, we just need to point to the next height. The chain indexing will
 	// then proceed with the first non-indexed block and forward the state
@@ -252,19 +225,6 @@ func (t *Transitions) IndexChain(s *State) error {
 	if err != nil {
 		return fmt.Errorf("could not index seals: %w", err)
 	}
-
-	// Next, we try to retrieve the next commit until it becomes available,
-	// at which point all the data coming from the execution data should be
-	// available.
-	//commit, err := t.chain.Commit(s.height)
-	//if errors.Is(err, archive.ErrUnavailable) {
-	//	log.Debug().Msg("waiting for next state commitment")
-	//	time.Sleep(t.cfg.WaitInterval)
-	//	return nil
-	//}
-	//if err != nil {
-	//	return fmt.Errorf("could not get commit: %w", err)
-	//}
 	collections, err := t.chain.Collections(s.height, s.chain)
 	if err != nil {
 		return fmt.Errorf("could not get collections: %w", err)
@@ -273,21 +233,10 @@ func (t *Transitions) IndexChain(s *State) error {
 	if err != nil {
 		return fmt.Errorf("could not get transactions: %w", err)
 	}
-	//results, err := t.chain.Results(s.height)
-	//if err != nil {
-	//	return fmt.Errorf("could not get transaction results: %w", err)
-	//}
 	events, err := t.chain.Events(s.height)
 	if err != nil {
 		return fmt.Errorf("could not get events: %w", err)
 	}
-
-	// Next, all we need to do is index the remaining data and we have fully
-	// processed indexing for this block height.
-	//err = t.write.Commit(s.height, commit)
-	//if err != nil {
-	//	return fmt.Errorf("could not index commit: %w", err)
-	//}
 	err = t.write.Collections(s.height, collections)
 	if err != nil {
 		return fmt.Errorf("could not index collections: %w", err)
@@ -296,26 +245,10 @@ func (t *Transitions) IndexChain(s *State) error {
 	if err != nil {
 		return fmt.Errorf("could not index transactions: %w", err)
 	}
-	//err = t.write.Results(results)
-	//if err != nil {
-	//	return fmt.Errorf("could not index transaction results: %w", err)
-	//}
 	err = t.write.Events(s.height, events)
 	if err != nil {
 		return fmt.Errorf("could not index events: %w", err)
 	}
-
-	// At this point, we need to forward the `last` state commitment to
-	// `next`, so we know what the state commitment was at the last finalized
-	// block we processed. This will allow us to know when to stop when
-	// walking back through the forest to collect trie updates.
-	s.last = s.next
-
-	// Last but not least, we need to update `next` to point to the commit we
-	// have just retrieved for the new block height. This is the sentinel that
-	// tells us when we have collected enough trie updates for the forest to
-	// have reached the next finalized block.
-	//s.next = commit
 
 	log.Info().Msg("indexed blockchain data for finalized block")
 
@@ -333,117 +266,26 @@ func (t *Transitions) UpdateTree(s *State) error {
 		return fmt.Errorf("invalid status for updating tree (%s)", s.status)
 	}
 
-	log := t.log.With().Uint64("height", s.height).Hex("last", s.last[:]).Hex("next", s.next[:]).Logger()
+	log := t.log.With().Uint64("height", s.height).Logger()
 
 	// If the forest contains a tree for the commit of the next finalized block,
 	// we have reached our goal, and we can go to the next step in order to
 	// collect the register payloads we want to index for that block.
-	ok := s.forest.Has(s.next)
-	if ok {
-		log.Info().Hex("commit", s.next[:]).Msg("matched commit of finalized block")
-		s.status = StatusCollect
-		return nil
-	}
-
-	// First, we get the next tree update from the feeder. We can skip it if
-	// it doesn't have any updated paths, or if we can't find the tree to apply
-	// it to in the forest. This usually means that it was meant for a pruned
-	// branch of the execution forest.
-	update, err := t.feed.Update()
+	paths, err := t.read.PathsByHeight(s.height)
 	if errors.Is(err, archive.ErrUnavailable) {
-		time.Sleep(t.cfg.WaitInterval)
-		log.Debug().Msg("waiting for next trie update")
-		return nil
+		return fmt.Errorf("could not get paths: %w", err)
 	}
 	if err != nil {
-		return fmt.Errorf("could not feed update: %w", err)
+		return err
 	}
-	parent := flow.StateCommitment(update.RootHash)
-	tree, ok := s.forest.Tree(parent)
-	if !ok {
-		log.Warn().Msg("state commitment mismatch, retrieving next trie update")
-		return nil
-	}
-
-	// We then apply the update to the relevant tree, as retrieved from the
-	// forest, and save the updated tree in the forest. If the tree is not new,
-	// we should error, as that should not happen.
-	paths, payloads := pathsPayloads(update)
-	tree, _, err = trie.NewTrieWithUpdatedRegisters(tree, paths, payloads, false)
-	if err != nil {
-		return fmt.Errorf("could not update tree: %w", err)
-	}
-	s.forest.Save(tree, paths, parent)
-
-	hash := tree.RootHash()
-	log.Info().Hex("commit", hash[:]).Int("registers", len(paths)).Msg("updated tree with register payloads")
-
-	return nil
-}
-
-// CollectRegisters reads the payloads for the next block to be indexed from the state's forest, unless payload
-// indexing is disabled.
-func (t *Transitions) CollectRegisters(s *State) error {
-	log := t.log.With().Uint64("height", s.height).Hex("commit", s.next[:]).Logger()
-	if s.status != StatusCollect {
-		return fmt.Errorf("invalid status for collecting registers (%s)", s.status)
-	}
-
-	// If indexing payloads is disabled, we can bypass collection and indexing
-	// of payloads and just go straight to forwarding the height to the next
-	// finalized block.
-	if t.cfg.SkipRegisters {
-		s.status = StatusForward
-		return nil
-	}
-
-	// If we index payloads, we are basically stepping back from (and including)
-	// the tree that corresponds to the next finalized block all the way up to
-	// (and excluding) the tree for the last finalized block we indexed. To do
-	// so, we will use the parent state commit to retrieve the parent trees from
-	// the forest, and we use the paths we recorded changes on to retrieve the
-	// changed payloads at each step.
-	commit := s.next
-	for commit != s.last {
-
-		// We do this check only once, so that we don't need to do it for
-		// each item we retrieve. The tree should always be there, but we
-		// should check just to not fail silently.
-		ok := s.forest.Has(commit)
-		if !ok {
-			return fmt.Errorf("could not load tree (commit: %x)", commit)
+	for _, key := range paths {
+		if s.registers[key] == nil {
+			s.status = StatusMap
+			return nil
 		}
-
-		// For each path, we retrieve the payload and add it to the registers we
-		// will index later. If we already have a payload for the path, it is
-		// more recent as we iterate backwards in time, so we can skip the
-		// outdated payload.
-		// NOTE: We read from the tree one by one here, as the performance
-		// overhead is minimal compared to the disk i/o for badger, and it
-		// allows us to ignore sorting of paths.
-		tree, _ := s.forest.Tree(commit)
-		paths, _ := s.forest.Paths(commit)
-		for _, path := range paths {
-			_, ok := s.registers[path]
-			if ok {
-				continue
-			}
-			payloads := tree.UnsafeRead([]ledger.Path{path})
-			s.registers[path] = payloads[0]
-		}
-
-		log.Debug().Int("batch", len(paths)).Msg("collected register batch for finalized block")
-
-		// We now step back to the parent of the current state trie.
-		parent, _ := s.forest.Parent(commit)
-		commit = parent
 	}
-
-	log.Info().Int("registers", len(s.registers)).Msg("collected all registers for finalized block")
-
-	// At this point, we have collected all the payloads, so we go to the next
-	// step, where we will index them.
-	s.status = StatusMap
+	log.Info().Msg("all registers for block already indexed")
+	s.status = StatusForward
 	return nil
 }
 
@@ -453,7 +295,7 @@ func (t *Transitions) MapRegisters(s *State) error {
 		return fmt.Errorf("invalid status for indexing registers (%s)", s.status)
 	}
 
-	log := t.log.With().Uint64("height", s.height).Hex("commit", s.next[:]).Logger()
+	log := t.log.With().Uint64("height", s.height).Logger()
 
 	// If there are no registers left to be indexed, we can go to the next step,
 	// which is about forwarding the height to the next finalized block.
@@ -512,7 +354,6 @@ func (t *Transitions) ForwardHeight(s *State) error {
 	// Now that we have indexed the heights, we can forward to the next height,
 	// and reset the forest to free up memory.
 	s.height++
-	s.forest.Reset(s.next)
 
 	t.log.Info().Uint64("height", s.height).Msg("forwarded finalized block to next height")
 

@@ -123,6 +123,8 @@ func (w *Writer) Payloads(height uint64, paths []ledger.Path, payloads []*ledger
 		ops = append(ops, w.lib.SavePayload(height, path, payload))
 	}
 
+	ops = append(ops, w.lib.IndexPayloadPathsForHeight(height, paths))
+
 	return w.apply(ops...)
 }
 

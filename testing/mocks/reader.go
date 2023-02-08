@@ -38,6 +38,7 @@ type Reader struct {
 	ResultFunc               func(txID flow.Identifier) (*flow.TransactionResult, error)
 	SealFunc                 func(sealID flow.Identifier) (*flow.Seal, error)
 	SealsByHeightFunc        func(height uint64) ([]flow.Identifier, error)
+	PathsByHeightFunc        func(height uint64) ([]ledger.Path, error)
 }
 
 func BaselineReader(t *testing.T) *Reader {
@@ -91,6 +92,9 @@ func BaselineReader(t *testing.T) *Reader {
 		},
 		SealsByHeightFunc: func(height uint64) ([]flow.Identifier, error) {
 			return GenericSealIDs(5), nil
+		},
+		PathsByHeightFunc: func(height uint64) ([]ledger.Path, error) {
+			return GenericLedgerPaths(6), nil
 		},
 	}
 
@@ -159,4 +163,8 @@ func (r *Reader) Seal(sealID flow.Identifier) (*flow.Seal, error) {
 
 func (r *Reader) SealsByHeight(height uint64) ([]flow.Identifier, error) {
 	return r.SealsByHeightFunc(height)
+}
+
+func (r *Reader) PathsByHeight(height uint64) ([]ledger.Path, error) {
+	return r.PathsByHeightFunc(height)
 }

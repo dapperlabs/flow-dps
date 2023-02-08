@@ -109,6 +109,10 @@ func (l *Library) IndexSealsForHeight(height uint64, sealIDs []flow.Identifier) 
 	return l.save(EncodeKey(PrefixSealsForHeight, height), sealIDs)
 }
 
+func (l *Library) IndexPayloadPathsForHeight(height uint64, paths []ledger.Path) func(txn *badger.Txn) error {
+	return l.save(EncodeKey(PrefixPayloadPathsForHeight, height), paths)
+}
+
 // SaveResult is an operation that writes the given transaction result.
 func (l *Library) SaveResult(result *flow.TransactionResult) func(*badger.Txn) error {
 	return l.save(EncodeKey(PrefixResults, result.TransactionID), result)
@@ -255,6 +259,11 @@ func (l *Library) LookupTransactionsForCollection(collID flow.Identifier, txIDs 
 // LookupSealsForHeight retrieves the identifiers of seals at the given height.
 func (l *Library) LookupSealsForHeight(height uint64, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
 	return l.retrieve(EncodeKey(PrefixSealsForHeight, height), sealIDs)
+}
+
+// LookupPayloadPathsForHeight retrieves the paths of a payload at the given height
+func (l *Library) LookupPayloadPathsForHeight(height uint64, paths *[]ledger.Path) func(txn *badger.Txn) error {
+	return l.retrieve(EncodeKey(PrefixPayloadPathsForHeight, height), paths)
 }
 
 // RetrieveResult retrieves the result with the given transaction identifier.

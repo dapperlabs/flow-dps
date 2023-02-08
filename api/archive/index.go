@@ -17,7 +17,6 @@ package archive
 import (
 	"context"
 	"fmt"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -337,4 +336,9 @@ func (i *Index) SealsByHeight(height uint64) ([]flow.Identifier, error) {
 	}
 
 	return sealIDs, nil
+}
+
+// PathsByHeight returns the register paths at the given height
+func (i *Index) PathsByHeight(height uint64) ([]ledger.Path, error) {
+	return nil, nil
 }
