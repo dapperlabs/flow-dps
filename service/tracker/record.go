@@ -16,16 +16,16 @@ package tracker
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 // RecordStreamer represents something that can stream block data.
 type RecordStreamer interface {
-	Next() (*entities.BlockExecutionData, error)
+	Next() (*execution_data.BlockExecutionData, error)
 }
 
 // RecordHolder represents something that can be used to request
 // block data for a specific block identifier.
 type RecordHolder interface {
-	Record(blockID flow.Identifier) (*entities.BlockExecutionData, error)
+	Record(blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
 }

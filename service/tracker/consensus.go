@@ -17,9 +17,7 @@ package tracker
 import (
 	"fmt"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	convert2 "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -200,13 +198,12 @@ func (c *Consensus) Collections(height uint64, chain flow.Chain) ([]*flow.LightC
 		return nil, fmt.Errorf("could not get record: %w", err)
 	}
 
-	collections := make([]*flow.LightCollection, 0, len(record.ChunkExecutionData))
-	for _, ced := range record.ChunkExecutionData {
-		chunk, err := convert2.MessageToChunkExecutionData(ced, chain)
+	collections := make([]*flow.LightCollection, 0, len(record.ChunkExecutionDatas))
+	for _, ced := range record.ChunkExecutionDatas {
 		if err != nil {
 			return nil, fmt.Errorf("could not convert record: %w", err)
 		}
-		nextLightCollection := chunk.Collection.Light()
+		nextLightCollection := ced.Collection.Light()
 		collections = append(collections, &nextLightCollection)
 	}
 
@@ -233,13 +230,12 @@ func (c *Consensus) Transactions(height uint64, chain flow.Chain) ([]*flow.Trans
 	}
 
 	transactions := make([]*flow.TransactionBody, 0)
-	for _, ced := range record.ChunkExecutionData {
-		chunk, err := convert2.MessageToChunkExecutionData(ced, chain)
+	for _, ced := range record.ChunkExecutionDatas {
 		if err != nil {
 			return nil, fmt.Errorf("could not convert record: %w", err)
 		}
 
-		transactionsToAdd := chunk.Collection.Transactions
+		transactionsToAdd := ced.Collection.Transactions
 		transactions = append(transactions, transactionsToAdd...)
 	}
 
@@ -289,19 +285,8 @@ func (c *Consensus) Events(height uint64) ([]flow.Event, error) {
 	}
 	events := make([]flow.Event, 0)
 
-	for _, chunk := range record.ChunkExecutionData {
-		eventsToAdd := make([]flow.Event, 0)
-		for _, event := range chunk.Events {
-			convertedEvent := flow.Event{
-				Type:             flow.EventType(event.Type),
-				TransactionID:    convert.MessageToIdentifier(event.TransactionId),
-				TransactionIndex: event.TransactionIndex,
-				EventIndex:       event.EventIndex,
-				Payload:          event.Payload,
-			}
-			eventsToAdd = append(eventsToAdd, convertedEvent)
-		}
-		events = append(events, eventsToAdd...)
+	for _, chunk := range record.ChunkExecutionDatas {
+		events = append(events, chunk.Events...)
 	}
 
 	if err != nil {

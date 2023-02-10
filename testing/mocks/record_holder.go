@@ -20,23 +20,20 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type RecordHolder struct {
-	RecordFunc func(blockID flow.Identifier) (*entities.BlockExecutionData, error)
+	RecordFunc func(blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
 }
 
 func BaselineRecordHolder(t *testing.T) *RecordHolder {
 	t.Helper()
 
 	r := RecordHolder{
-		RecordFunc: func(id flow.Identifier) (*entities.BlockExecutionData, error) {
+		RecordFunc: func(id flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			numChunks := 5
-			ced := make([]*entities.ChunkExecutionData, numChunks)
+			ced := make([]*execution_data.ChunkExecutionData, numChunks)
 
 			for i := 0; i < numChunks; i++ {
 				header := unittest.BlockHeaderFixture()
@@ -50,16 +47,12 @@ func BaselineRecordHolder(t *testing.T) *RecordHolder {
 					Events:     events,
 					TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
 				}
-				convertedChunk, err := convert.ChunkExecutionDataToMessage(chunk)
-				if err != nil {
-					return nil, err
-				}
-				ced[i] = convertedChunk
+				ced[i] = chunk
 			}
 
-			data := entities.BlockExecutionData{
-				BlockId:            convert.IdentifierToMessage(id),
-				ChunkExecutionData: ced,
+			data := execution_data.BlockExecutionData{
+				BlockID:             id,
+				ChunkExecutionDatas: ced,
 			}
 
 			return &data, nil
@@ -69,6 +62,6 @@ func BaselineRecordHolder(t *testing.T) *RecordHolder {
 	return &r
 }
 
-func (r *RecordHolder) Record(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
+func (r *RecordHolder) Record(blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 	return r.RecordFunc(blockID)
 }

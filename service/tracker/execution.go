@@ -21,12 +21,10 @@ import (
 	"github.com/gammazero/deque"
 	"github.com/rs/zerolog"
 
-	convert2 "github.com/onflow/flow-archive/models/convert"
-	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // Execution is the DPS execution follower, which keeps track of updates to the
@@ -38,7 +36,7 @@ type Execution struct {
 	queue     *deque.Deque
 	stream    RecordStreamer
 	db        *badger.DB
-	records   map[flow.Identifier]*entities.BlockExecutionData
+	records   map[flow.Identifier]*execution_data.BlockExecutionData
 	heightMap map[flow.Identifier]uint64
 }
 
@@ -80,13 +78,13 @@ func NewExecution(log zerolog.Logger, db *badger.DB, stream RecordStreamer) (*Ex
 		stream:    stream,
 		queue:     deque.New(),
 		db:        db,
-		records:   make(map[flow.Identifier]*entities.BlockExecutionData),
+		records:   make(map[flow.Identifier]*execution_data.BlockExecutionData),
 		heightMap: make(map[flow.Identifier]uint64),
 	}
 
-	record := entities.BlockExecutionData{
-		BlockId:            convert.IdentifierToMessage(blockID),
-		ChunkExecutionData: nil,
+	record := execution_data.BlockExecutionData{
+		BlockID:             blockID,
+		ChunkExecutionDatas: nil,
 	}
 
 	e.records[blockID] = &record
@@ -123,7 +121,7 @@ func (e *Execution) Update() (*ledger.TrieUpdate, error) {
 // Record returns the block record for the given block ID, if it is available.
 // Once a block record is returned, all block records at a height lower than
 // the height of the returned record are purged from the cache.
-func (e *Execution) Record(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
+func (e *Execution) Record(blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 
 	// If we have the block available in the cache, let's feed it to the
 	// consumer.
@@ -157,7 +155,7 @@ func (e *Execution) processNext() error {
 
 	// Check if we already processed a block with this ID recently. This should
 	// be idempotent, but we should be aware if something like this happens.
-	blockID := convert.MessageToIdentifier(record.BlockId)
+	blockID := record.BlockID
 	_, ok := e.records[blockID]
 	if ok {
 		return fmt.Errorf("duplicate execution record (block: %x)", blockID)
@@ -173,7 +171,7 @@ func (e *Execution) processNext() error {
 	}
 	e.heightMap[blockID] = header.Height
 	recordCount := 0
-	for _, ced := range record.ChunkExecutionData {
+	for _, ced := range record.ChunkExecutionDatas {
 		update := ced.TrieUpdate
 		// The Flow execution node includes `nil` updates in the slice, instead
 		// of empty updates. We could fix this here, but we don't have the root
@@ -181,12 +179,10 @@ func (e *Execution) processNext() error {
 		if update == nil {
 			continue
 		}
-
-		trieUpdate, err := convert2.MessageToTrieUpdate(ced.TrieUpdate)
 		if err != nil {
 			return fmt.Errorf("could not convert trie update: %w", err)
 		}
-		e.queue.PushFront(trieUpdate)
+		e.queue.PushFront(ced.TrieUpdate)
 		recordCount++
 	}
 

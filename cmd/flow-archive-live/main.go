@@ -285,7 +285,7 @@ func run() int {
 	// streamer is responsible for retrieving block execution records from a
 	// Google Cloud Storage bucket. This component plays the role of what would
 	// otherwise be a network protocol, such as a publish socket.
-	stream := datasync.NewExecDataSync(log, flagExecData, nil, datasync.WithCatchupBlocks(blockIDs))
+	stream := datasync.NewExecDataSync(log, flagExecData, nil, chainID, datasync.WithCatchupBlocks(blockIDs))
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus

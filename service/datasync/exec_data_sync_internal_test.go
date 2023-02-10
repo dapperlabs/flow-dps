@@ -1,12 +1,13 @@
 package datasync
 
 import (
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-archive/testing/mocks"
-	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/optakt/flow-dps/models/dps"
@@ -37,6 +38,7 @@ func TestNewExecDataSync(t *testing.T) {
 		log,
 		accessNode,
 		mockApiClient,
+		flow.Testnet.Chain(),
 		WithBufferSize(limit),
 		WithCatchupBlocks(blockIDs),
 	)
@@ -52,7 +54,7 @@ func TestNewExecDataSync(t *testing.T) {
 	}
 }
 
-func TestGCPStreamer_OnBlockFinalized(t *testing.T) {
+func TestStreamer_OnBlockFinalized(t *testing.T) {
 	block := mocks.GenericBlock
 	queue := archive.NewDeque()
 
@@ -67,7 +69,7 @@ func TestGCPStreamer_OnBlockFinalized(t *testing.T) {
 	assert.Equal(t, queue.PopFront(), block.BlockID)
 }
 
-func TestGCPStreamer_Next(t *testing.T) {
+func TestStreamer_Next(t *testing.T) {
 	record := mocks.GenericRecord()
 	_, err := cbor.Marshal(record)
 	require.NoError(t, err)
@@ -76,12 +78,11 @@ func TestGCPStreamer_Next(t *testing.T) {
 	decoder, err := decOptions.DecMode()
 	require.NoError(t, err)
 
-	bed := entities.BlockExecutionData{
-		BlockId:            nil,
-		ChunkExecutionData: nil,
-	}
+	bed, err := convert.BlockExecutionDataToMessage(record)
+	require.NoError(t, err)
+
 	mockResponse := execData.GetExecutionDataByBlockIDResponse{
-		BlockExecutionData: &bed,
+		BlockExecutionData: bed,
 	}
 
 	var mockApiClient execData.ExecutionDataAPIClient = mocks.MockExecAPIClient{
@@ -99,6 +100,7 @@ func TestGCPStreamer_Next(t *testing.T) {
 			queue:       archive.NewDeque(),
 			buffer:      archive.NewDeque(),
 			limit:       999,
+			chain:       flow.Testnet.Chain(),
 		}
 
 		streamer.buffer.PushFront(record)
@@ -135,7 +137,7 @@ func TestGCPStreamer_Next(t *testing.T) {
 			limit:       999,
 		}
 
-		streamer.queue.PushFront(convert.MessageToIdentifier(record.BlockId))
+		streamer.queue.PushFront(record.BlockID)
 
 		_, err = streamer.Next()
 

@@ -15,19 +15,19 @@
 package mocks
 
 import (
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"testing"
 )
 
 type RecordStreamer struct {
-	NextFunc func() (*entities.BlockExecutionData, error)
+	NextFunc func() (*execution_data.BlockExecutionData, error)
 }
 
 func BaselineRecordStreamer(t *testing.T) *RecordStreamer {
 	t.Helper()
 
 	r := RecordStreamer{
-		NextFunc: func() (*entities.BlockExecutionData, error) {
+		NextFunc: func() (*execution_data.BlockExecutionData, error) {
 			return GenericRecord(), nil
 		},
 	}
@@ -35,6 +35,6 @@ func BaselineRecordStreamer(t *testing.T) *RecordStreamer {
 	return &r
 }
 
-func (r *RecordStreamer) Next() (*entities.BlockExecutionData, error) {
+func (r *RecordStreamer) Next() (*execution_data.BlockExecutionData, error) {
 	return r.NextFunc()
 }

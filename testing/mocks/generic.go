@@ -18,14 +18,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	convert2 "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"io"
 	"math/rand"
 	"time"
@@ -487,9 +484,9 @@ func GenericSeal(index int) *flow.Seal {
 	return GenericSeals(index + 1)[index]
 }
 
-func GenericRecord() *entities.BlockExecutionData {
+func GenericRecord() *execution_data.BlockExecutionData {
 	numChunks := 5
-	ced := make([]*entities.ChunkExecutionData, numChunks)
+	ced := make([]*execution_data.ChunkExecutionData, numChunks)
 
 	for i := 0; i < numChunks; i++ {
 		header := unittest.BlockHeaderFixture()
@@ -503,16 +500,12 @@ func GenericRecord() *entities.BlockExecutionData {
 			Events:     events,
 			TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
 		}
-		convertedChunk, err := convert2.ChunkExecutionDataToMessage(chunk)
-		if err != nil {
-			return nil
-		}
-		ced[i] = convertedChunk
+		ced[i] = chunk
 	}
 
-	data := entities.BlockExecutionData{
-		BlockId:            convert.IdentifierToMessage(GenericHeader.ID()),
-		ChunkExecutionData: ced,
+	data := execution_data.BlockExecutionData{
+		BlockID:             GenericHeader.ID(),
+		ChunkExecutionDatas: ced,
 	}
 
 	return &data

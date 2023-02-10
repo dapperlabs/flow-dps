@@ -15,16 +15,15 @@
 package tracker
 
 import (
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/gammazero/deque"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
 
@@ -151,11 +150,11 @@ func TestExecution_Purge(t *testing.T) {
 	//}
 
 	blockIDs := mocks.GenericBlockIDs(4)
-	blocks := []*entities.BlockExecutionData{
-		{BlockId: convert.IdentifierToMessage(blockIDs[0]), ChunkExecutionData: nil},
-		{BlockId: convert.IdentifierToMessage(blockIDs[1]), ChunkExecutionData: nil},
-		{BlockId: convert.IdentifierToMessage(blockIDs[2]), ChunkExecutionData: nil},
-		{BlockId: convert.IdentifierToMessage(blockIDs[3]), ChunkExecutionData: nil},
+	blocks := []*execution_data.BlockExecutionData{
+		{BlockID: blockIDs[0], ChunkExecutionDatas: nil},
+		{BlockID: blockIDs[1], ChunkExecutionDatas: nil},
+		{BlockID: blockIDs[2], ChunkExecutionDatas: nil},
+		{BlockID: blockIDs[3], ChunkExecutionDatas: nil},
 	}
 	blockHeights := []uint64{4, 5, 6, 7}
 
@@ -163,17 +162,17 @@ func TestExecution_Purge(t *testing.T) {
 		name string
 
 		threshold    uint64
-		before       map[flow.Identifier]*entities.BlockExecutionData
+		before       map[flow.Identifier]*execution_data.BlockExecutionData
 		heightBefore map[flow.Identifier]uint64
 
-		after       map[flow.Identifier]*entities.BlockExecutionData
+		after       map[flow.Identifier]*execution_data.BlockExecutionData
 		heightAfter map[flow.Identifier]uint64
 	}{
 		{
 			name: "threshold is at lowest height",
 
 			threshold: blockHeights[0],
-			before: map[flow.Identifier]*entities.BlockExecutionData{
+			before: map[flow.Identifier]*execution_data.BlockExecutionData{
 				blockIDs[0]: blocks[0],
 				blockIDs[1]: blocks[1],
 				blockIDs[2]: blocks[2],
@@ -185,7 +184,7 @@ func TestExecution_Purge(t *testing.T) {
 				blockIDs[2]: blockHeights[2],
 				blockIDs[3]: blockHeights[3],
 			},
-			after: map[flow.Identifier]*entities.BlockExecutionData{
+			after: map[flow.Identifier]*execution_data.BlockExecutionData{
 				blockIDs[0]: blocks[0],
 				blockIDs[1]: blocks[1],
 				blockIDs[2]: blocks[2],
@@ -202,7 +201,7 @@ func TestExecution_Purge(t *testing.T) {
 			name: "threshold is above highest height",
 
 			threshold: blockHeights[3] + 1,
-			before: map[flow.Identifier]*entities.BlockExecutionData{
+			before: map[flow.Identifier]*execution_data.BlockExecutionData{
 				blockIDs[0]: blocks[0],
 				blockIDs[1]: blocks[1],
 				blockIDs[2]: blocks[2],
@@ -214,14 +213,14 @@ func TestExecution_Purge(t *testing.T) {
 				blockIDs[2]: blockHeights[2],
 				blockIDs[3]: blockHeights[3],
 			},
-			after:       map[flow.Identifier]*entities.BlockExecutionData{},
+			after:       map[flow.Identifier]*execution_data.BlockExecutionData{},
 			heightAfter: map[flow.Identifier]uint64{},
 		},
 		{
 			name: "threshold is in-between",
 
 			threshold: blockHeights[2],
-			before: map[flow.Identifier]*entities.BlockExecutionData{
+			before: map[flow.Identifier]*execution_data.BlockExecutionData{
 				blockIDs[0]: blocks[0],
 				blockIDs[1]: blocks[1],
 				blockIDs[2]: blocks[2],
@@ -233,7 +232,7 @@ func TestExecution_Purge(t *testing.T) {
 				blockIDs[2]: blockHeights[2],
 				blockIDs[3]: blockHeights[3],
 			},
-			after: map[flow.Identifier]*entities.BlockExecutionData{
+			after: map[flow.Identifier]*execution_data.BlockExecutionData{
 				blockIDs[2]: blocks[2],
 				blockIDs[3]: blocks[3],
 			},
@@ -246,9 +245,9 @@ func TestExecution_Purge(t *testing.T) {
 			name: "does nothing when there is nothing to purge",
 
 			threshold:    blockHeights[2],
-			before:       map[flow.Identifier]*entities.BlockExecutionData{},
+			before:       map[flow.Identifier]*execution_data.BlockExecutionData{},
 			heightBefore: map[flow.Identifier]uint64{},
-			after:        map[flow.Identifier]*entities.BlockExecutionData{},
+			after:        map[flow.Identifier]*execution_data.BlockExecutionData{},
 			heightAfter:  map[flow.Identifier]uint64{},
 		},
 	}
@@ -280,7 +279,7 @@ func BaselineExecution(t *testing.T, opts ...func(*Execution)) *Execution {
 		log:       zerolog.Nop(),
 		queue:     deque.New(),
 		stream:    mocks.BaselineRecordStreamer(t),
-		records:   make(map[flow.Identifier]*entities.BlockExecutionData),
+		records:   make(map[flow.Identifier]*execution_data.BlockExecutionData),
 		heightMap: make(map[flow.Identifier]uint64),
 	}
 

@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/optakt/flow-dps/models/dps"
 	"github.com/rs/zerolog"
@@ -29,10 +30,11 @@ type ExecDataSync struct {
 	buffer      *archive.SafeDeque // queue of downloaded execution data records
 	limit       uint               // buffer size limit for downloaded records
 	busy        uint32             // used as a guard to avoid concurrent polling
+	chain       flow.Chain
 }
 
 // NewExecDataSync returns a new Exec data sync object using the given AN client and options.
-func NewExecDataSync(log zerolog.Logger, execDataAddr string, client execData.ExecutionDataAPIClient, options ...Option) *ExecDataSync {
+func NewExecDataSync(log zerolog.Logger, execDataAddr string, client execData.ExecutionDataAPIClient, chain flow.Chain, options ...Option) *ExecDataSync {
 
 	cfg := DefaultConfig
 	for _, option := range options {
@@ -63,6 +65,7 @@ func NewExecDataSync(log zerolog.Logger, execDataAddr string, client execData.Ex
 		buffer:      archive.NewDeque(),
 		limit:       cfg.BufferSize,
 		busy:        0,
+		chain:       chain,
 	}
 
 	for _, blockID := range cfg.CatchupBlocks {
@@ -96,7 +99,7 @@ func (e *ExecDataSync) OnBlockFinalized(block *model.Block) {
 
 // Next returns the next available block data. It returns an ErrUnavailable if no block
 // data is available at the moment.
-func (e *ExecDataSync) Next() (*entities.BlockExecutionData, error) {
+func (e *ExecDataSync) Next() (*execution_data.BlockExecutionData, error) {
 
 	// If we are not polling already, we want to start polling in the
 	// background. This will try to fill the buffer up until its limit is
@@ -117,7 +120,7 @@ func (e *ExecDataSync) Next() (*entities.BlockExecutionData, error) {
 	// concurrency safe, so there is no problem with popping from the back while
 	// the poll is pushing new items in the front.
 	record := e.buffer.PopBack()
-	return record.(*entities.BlockExecutionData), nil
+	return record.(*execution_data.BlockExecutionData), nil
 }
 
 func (e *ExecDataSync) poll() {
@@ -183,12 +186,16 @@ func (e *ExecDataSync) getExecData() error {
 	}
 }
 
-func (e *ExecDataSync) pullData(ctx context.Context, blockID flow.Identifier) (*entities.BlockExecutionData, error) {
+func (e *ExecDataSync) pullData(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 	// query AN from cached connection
 	req := &execData.GetExecutionDataByBlockIDRequest{BlockId: blockID[:]}
 	res, err := e.execDataApi.GetExecutionDataByBlockID(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return res.BlockExecutionData, nil
+	blockExecData, err := convert.MessageToBlockExecutionData(res.BlockExecutionData, e.chain)
+	if err != nil {
+		return nil, err
+	}
+	return blockExecData, nil
 }

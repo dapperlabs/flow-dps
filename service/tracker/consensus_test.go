@@ -15,20 +15,17 @@
 package tracker_test
 
 import (
-	"github.com/onflow/flow-go/access/legacy/convert"
-	convert2 "github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-archive/service/tracker"
 	"github.com/onflow/flow-archive/testing/helpers"
 	"github.com/onflow/flow-archive/testing/mocks"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 func TestConsensus_Root(t *testing.T) {
@@ -339,9 +336,9 @@ func TestConsensus_Collections(t *testing.T) {
 		db := helpers.InMemoryDB(t)
 		defer db.Close()
 
-		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, convert.MessageToIdentifier(record.BlockId))))
+		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, record.BlockID)))
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			assert.Equal(t, header.ID(), blockID)
 
 			return record, nil
@@ -356,11 +353,9 @@ func TestConsensus_Collections(t *testing.T) {
 
 		got, err := cons.Collections(header.Height, flow.Testnet.Chain())
 		require.NoError(t, err)
-		require.Len(t, got, len(record.ChunkExecutionData))
-		for i, chunk := range record.ChunkExecutionData {
-			ced, err := convert2.MessageToChunkExecutionData(chunk, flow.Testnet.Chain())
-			require.NoError(t, err, "could not convert chunk exec data")
-			for _, tx := range ced.Collection.Transactions {
+		require.Len(t, got, len(record.ChunkExecutionDatas))
+		for i, chunk := range record.ChunkExecutionDatas {
+			for _, tx := range chunk.Collection.Transactions {
 				assert.Contains(t, got[i].Transactions, tx.ID())
 			}
 		}
@@ -375,7 +370,7 @@ func TestConsensus_Collections(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -398,7 +393,7 @@ func TestConsensus_Collections(t *testing.T) {
 		defer db.Close()
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -423,7 +418,7 @@ func TestConsensus_Collections(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 
@@ -453,7 +448,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			assert.Equal(t, header.ID(), blockID)
 
 			return record, nil
@@ -469,10 +464,8 @@ func TestConsensus_Transactions(t *testing.T) {
 		got, err := cons.Transactions(header.Height, flow.Testnet.Chain())
 
 		require.NoError(t, err)
-		for _, chunk := range record.ChunkExecutionData {
-			ced, err := convert2.MessageToChunkExecutionData(chunk, flow.Testnet.Chain())
-			require.NoError(t, err, "could not convert chunk exec data")
-			for _, tx := range ced.Collection.Transactions {
+		for _, chunk := range record.ChunkExecutionDatas {
+			for _, tx := range chunk.Collection.Transactions {
 				assert.Contains(t, got, tx)
 			}
 		}
@@ -487,7 +480,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -510,7 +503,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		defer db.Close()
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -535,7 +528,7 @@ func TestConsensus_Transactions(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 
@@ -672,7 +665,7 @@ func TestConsensus_Events(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(blockID flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			assert.Equal(t, header.ID(), blockID)
 
 			return record, nil
@@ -689,14 +682,12 @@ func TestConsensus_Events(t *testing.T) {
 
 		require.NoError(t, err)
 		eventLen := 0
-		for _, chunk := range record.ChunkExecutionData {
+		for _, chunk := range record.ChunkExecutionDatas {
 			eventLen += len(chunk.Events)
 		}
 		assert.Len(t, got, eventLen)
-		for _, chunk := range record.ChunkExecutionData {
-			ced, err := convert2.MessageToChunkExecutionData(chunk, flow.Testnet.Chain())
-			require.NoError(t, err, "could not convert chunk exec data")
-			for _, event := range ced.Events {
+		for _, chunk := range record.ChunkExecutionDatas {
+			for _, event := range chunk.Events {
 				assert.Contains(t, got, event)
 			}
 		}
@@ -711,7 +702,7 @@ func TestConsensus_Events(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -734,7 +725,7 @@ func TestConsensus_Events(t *testing.T) {
 		defer db.Close()
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return record, nil
 		}
 
@@ -759,7 +750,7 @@ func TestConsensus_Events(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, header.ID())))
 
 		holder := mocks.BaselineRecordHolder(t)
-		holder.RecordFunc = func(flow.Identifier) (*entities.BlockExecutionData, error) {
+		holder.RecordFunc = func(flow.Identifier) (*execution_data.BlockExecutionData, error) {
 			return nil, mocks.GenericError
 		}
 
