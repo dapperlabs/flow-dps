@@ -6,7 +6,7 @@ import (
 
 // DefaultConfig is the default configuration for the Streamer.
 var DefaultConfig = Config{
-	BufferSize:    32000000,
+	BufferSize:    20,
 	CatchupBlocks: []flow.Identifier{},
 }
 
