@@ -25,9 +25,9 @@ type ExecDataSync struct {
 	log         zerolog.Logger
 	decoder     cbor.DecMode
 	execDataApi execData.ExecutionDataAPIClient
-	queue       *archive.SafeDeque // queue of block identifiers for next downloads
-	buffer      *archive.SafeDeque // queue of downloaded execution data records
-	limit       uint               // buffer size limit for downloaded records
+	blocks      *archive.SafeDeque // blocks of block identifiers for next downloads
+	records     *archive.SafeDeque // blocks of downloaded execution data records
+	limit       uint               // records size limit for downloaded records
 	busy        uint32             // used as a guard to avoid concurrent polling
 	chain       flow.Chain
 }
@@ -60,15 +60,15 @@ func NewExecDataSync(log zerolog.Logger, execDataAddr string, client execData.Ex
 		log:         log.With().Str("component", "exec_data_sync").Logger(),
 		decoder:     decoder,
 		execDataApi: exeDataApi,
-		queue:       archive.NewDeque(),
-		buffer:      archive.NewDeque(),
+		blocks:      archive.NewDeque(),
+		records:     archive.NewDeque(),
 		limit:       cfg.BufferSize,
 		busy:        0,
 		chain:       chain,
 	}
 
 	for _, blockID := range cfg.CatchupBlocks {
-		e.queue.PushFront(blockID)
+		e.blocks.PushFront(blockID)
 		e.log.Debug().Hex("block", blockID[:]).Msg("execution record queued for catch-up")
 	}
 
@@ -89,9 +89,9 @@ func getAPIClient(addr string) execData.ExecutionDataAPIClient {
 // each time a block is finalized by the Flow consensus algorithm.
 func (e *ExecDataSync) OnBlockFinalized(block *model.Block) {
 	blockID := block.BlockID
-	// We push the block ID to the front of the queue; the streamer will try to
+	// We push the block ID to the front of the blocks; the streamer will try to
 	// download the blocks in a FIFO manner.
-	e.queue.PushFront(blockID)
+	e.blocks.PushFront(blockID)
 
 	e.log.Debug().Hex("block", blockID[:]).Msg("execution record queued for download")
 }
@@ -101,31 +101,31 @@ func (e *ExecDataSync) OnBlockFinalized(block *model.Block) {
 func (e *ExecDataSync) Next() (*execution_data.BlockExecutionData, error) {
 
 	// If we are not polling already, we want to start polling in the
-	// background. This will try to fill the buffer up until its limit is
+	// background. This will try to fill the records up until its limit is
 	// reached. It basically means that the cloud streamer will always be
 	// downloading if something is available and the execution tracker is asking
 	// for the next record.
 	go e.poll()
 
-	// If we have nothing in the buffer, we can return the unavailable error,
+	// If we have nothing in the records, we can return the unavailable error,
 	// which will cause the mapper logic to go into a wait state and retry a bit
 	// later.
-	if e.buffer.Len() == 0 {
-		e.log.Debug().Msg("buffer empty, no execution record available")
+	if e.records.Len() == 0 {
+		e.log.Debug().Msg("records empty, no execution record available")
 		return nil, archive.ErrUnavailable
 	}
 
-	// If we have a record in the buffer, we will just return it. The buffer is
+	// If we have a record in the records, we will just return it. The records is
 	// concurrency safe, so there is no problem with popping from the back while
 	// the poll is pushing new items in the front.
-	record := e.buffer.PopBack()
+	record := e.records.PopBack()
 	return record.(*execution_data.BlockExecutionData), nil
 }
 
 func (e *ExecDataSync) poll() {
 
 	// We only call `Next()` sequentially, so there is no need to guard it from
-	// concurrent access. However, when the buffer is not empty, we might still
+	// concurrent access. However, when the records is not empty, we might still
 	// be polling for new data in the background when the next call happens. We
 	// thus need to ensure that only one poll is executed at the same time. We
 	// do this with a simple flag that is set atomically to work like a
@@ -152,9 +152,9 @@ func (e *ExecDataSync) getExecData() error {
 
 	for {
 
-		// We only want to retrieve and process execData blocks until the buffer is full.
-		if uint(e.buffer.Len()) >= e.limit {
-			e.log.Debug().Uint("limit", e.limit).Msg("buffer full, stopping execution record pull")
+		// We only want to retrieve and process execData blocks until the records is full.
+		if uint(e.records.Len()) >= e.limit {
+			e.log.Debug().Uint("limit", e.limit).Msg("records full, stopping execution record pull")
 			return nil
 		}
 
@@ -164,24 +164,24 @@ func (e *ExecDataSync) getExecData() error {
 		// finalized, even if the data is available before. However, it seems to
 		// be the only way to make sure trie updates are delivered to the mapper
 		// in the right order without changing the way uploads work.
-		if uint(e.queue.Len()) == 0 {
-			e.log.Debug().Msg("queue empty, stopping execution record download")
+		if e.blocks.Len() == 0 {
+			e.log.Debug().Msg("blocks empty, stopping execution record download")
 			return nil
 		}
 
 		// Get the name of the file based on the block ID. The file n
-		blockID := e.queue.PopBack().(flow.Identifier)
+		blockID := e.blocks.PopBack().(flow.Identifier)
 		record, err := e.pullData(context.Background(), blockID)
 		if err != nil {
-			e.queue.PushBack(blockID)
+			e.blocks.PushBack(blockID)
 			return fmt.Errorf("could not pull execution record (name: %s): %w", blockID, err)
 		}
 
 		e.log.Debug().
 			Hex("blockID", blockID[:]).
-			Msg("pushing execution record into buffer")
+			Msg("pushing execution record into records")
 
-		e.buffer.PushFront(record)
+		e.records.PushFront(record)
 	}
 }
 

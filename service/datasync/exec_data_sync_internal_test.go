@@ -45,11 +45,11 @@ func TestNewExecDataSync(t *testing.T) {
 	require.NotNil(t, streamer)
 	assert.NotZero(t, streamer.log)
 	assert.Equal(t, limit, streamer.limit)
-	assert.NotNil(t, streamer.queue)
-	assert.NotNil(t, streamer.buffer)
+	assert.NotNil(t, streamer.blocks)
+	assert.NotNil(t, streamer.records)
 
-	for streamer.queue.Len() > 0 {
-		assert.Contains(t, blockIDs, streamer.queue.PopFront())
+	for streamer.blocks.Len() > 0 {
+		assert.Contains(t, blockIDs, streamer.blocks.PopFront())
 	}
 }
 
@@ -58,8 +58,8 @@ func TestStreamer_OnBlockFinalized(t *testing.T) {
 	queue := archive.NewDeque()
 
 	streamer := &ExecDataSync{
-		log:   zerolog.Nop(),
-		queue: queue,
+		log:    zerolog.Nop(),
+		blocks: queue,
 	}
 
 	streamer.OnBlockFinalized(block)
@@ -96,13 +96,13 @@ func TestStreamer_Next(t *testing.T) {
 			log:         zerolog.Nop(),
 			decoder:     decoder,
 			execDataApi: mockApiClient,
-			queue:       archive.NewDeque(),
-			buffer:      archive.NewDeque(),
+			blocks:      archive.NewDeque(),
+			records:     archive.NewDeque(),
 			limit:       999,
 			chain:       flow.Testnet.Chain(),
 		}
 
-		streamer.buffer.PushFront(record)
+		streamer.records.PushFront(record)
 
 		got, err := streamer.Next()
 
@@ -115,8 +115,8 @@ func TestStreamer_Next(t *testing.T) {
 			log:         zerolog.Nop(),
 			decoder:     decoder,
 			execDataApi: mockApiClient,
-			queue:       archive.NewDeque(),
-			buffer:      archive.NewDeque(),
+			blocks:      archive.NewDeque(),
+			records:     archive.NewDeque(),
 			limit:       999,
 		}
 
@@ -131,12 +131,12 @@ func TestStreamer_Next(t *testing.T) {
 			log:         zerolog.Nop(),
 			decoder:     decoder,
 			execDataApi: mockApiClient,
-			queue:       archive.NewDeque(),
-			buffer:      archive.NewDeque(),
+			blocks:      archive.NewDeque(),
+			records:     archive.NewDeque(),
 			limit:       999,
 		}
 
-		streamer.queue.PushFront(record.BlockID)
+		streamer.blocks.PushFront(record.BlockID)
 
 		_, err = streamer.Next()
 
