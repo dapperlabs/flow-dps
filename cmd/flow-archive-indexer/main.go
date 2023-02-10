@@ -27,6 +27,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+
 	"github.com/onflow/flow-archive/codec/zbor"
 	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-archive/service/chain"
@@ -131,6 +133,13 @@ func run() int {
 		return failure
 	}
 
+	// We perform a check to verify if the chain id entered is valid, otherwise
+	// the RN won't be able to convert the incoming block execution data
+	if !convert.ValidChainIds[flagChainID] {
+		log.Error().Msg("Invalid chain id inputted as a config parameter")
+	}
+	chainID := flow.ChainID(flagChainID).Chain()
+
 	// The chain is responsible for reading blockchain data from the protocol state.
 	disk := chain.FromDisk(protocolDB)
 
@@ -186,7 +195,7 @@ func run() int {
 		mapper.WithSkipRegisters(flagSkip),
 	)
 	forest := forest.New()
-	state := mapper.EmptyState(forest, flow.ChainID(flagChainID).Chain())
+	state := mapper.EmptyState(forest, chainID)
 	fsm := mapper.NewFSM(state,
 		mapper.WithTransition(mapper.StatusInitialize, transitions.InitializeMapper),
 		mapper.WithTransition(mapper.StatusBootstrap, transitions.BootstrapState),

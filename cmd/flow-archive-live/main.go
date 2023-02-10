@@ -38,6 +38,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	unstaked "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -171,6 +172,13 @@ func run() int {
 		log.Error().Msg("index database is empty, please provide root checkpoint (-c, --checkpoint) to bootstrap")
 		return failure
 	}
+
+	// We perform a check to verify if the chain id entered is valid, otherwise
+	// the RN won't be able to convert the incoming block execution data
+	if !convert.ValidChainIds[flagChainID] {
+		log.Error().Msg("Invalid chain id inputted as a config parameter")
+	}
+	chainID := flow.ChainID(flagChainID).Chain()
 
 	// We initialize the writer with a flush interval, which will make sure that
 	// Badger transactions are committed to the database, even if they don't
@@ -333,7 +341,7 @@ func run() int {
 		mapper.WithSkipRegisters(flagSkip),
 	)
 	forest := forest.New()
-	state := mapper.EmptyState(forest, flow.ChainID(flagChainID).Chain())
+	state := mapper.EmptyState(forest, chainID)
 	fsm := mapper.NewFSM(state,
 		mapper.WithTransition(mapper.StatusInitialize, transitions.InitializeMapper),
 		mapper.WithTransition(mapper.StatusBootstrap, transitions.BootstrapState),
