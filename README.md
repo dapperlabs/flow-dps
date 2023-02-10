@@ -1,8 +1,8 @@
 # Flow Data Provisioning Service
 
-[![CI Status](https://img.shields.io/github/workflow/status/optakt/flow-dps/MasterCI?logo=GitHub%20Actions&label=&logoColor=silver&labelColor=gray)](https://github.com/optakt/flow-dps/actions/workflows/master.yml)
-[![License](https://img.shields.io/github/license/nanomsg/mangos.svg?logoColor=silver&logo=Open%20Source%20Initiative&label=&color=blue)](https://github.com/optakt/flow-dps/blob/master/LICENSE)
-[![Documentation](https://img.shields.io/badge/godoc-docs-blue.svg?label=&logo=go)](https://pkg.go.dev/github.com/optakt/flow-dps)
+[![CI Status](https://img.shields.io/github/workflow/status/onflow/flow-archive/MasterCI?logo=GitHub%20Actions&label=&logoColor=silver&labelColor=gray)](https://github.com/onflow/flow-archive/actions/workflows/master.yml)
+[![License](https://img.shields.io/github/license/nanomsg/mangos.svg?logoColor=silver&logo=Open%20Source%20Initiative&label=&color=blue)](https://github.com/onflow/flow-archive/blob/master/LICENSE)
+[![Documentation](https://img.shields.io/badge/godoc-docs-blue.svg?label=&logo=go)](https://pkg.go.dev/github.com/onflow/flow-archive)
 [![Internal Documentation](https://img.shields.io/badge/-documentation-grey?logo=markdown)](./docs/introduction.md)
 
 The Flow Archive aims at providing a scalable and efficient way to access the history of the Flow
@@ -39,7 +39,7 @@ The Archive API gives access to historical data at any given height.
 
 There are also additional API layers that can be run on top of the DPS API:
 
-* [Access API](https://github.com/optakt/flow-dps-access)
+* [Access API](https://github.com/onflow/flow-archive-access)
 
 ### Developer Documentation
 

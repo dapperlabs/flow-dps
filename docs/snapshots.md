@@ -19,7 +19,7 @@ Technical documentation can be found [here](https://pkg.go.dev/github.com/dgraph
 
 ## Creating a Snapshot
 
-Index snapshots are created using `create-index-snapshot` CLI tool, which is documented [here](https://github.com/optakt/flow-dps/blob/master/cmd/create-index-snapshot/README.md).
+Index snapshots are created using `create-index-snapshot` CLI tool, which is documented [here](https://github.com/onflow/flow-archive/blob/master/cmd/create-index-snapshot/README.md).
 By default, the snapshot is not encoded and output contains raw (binary) data.
 
 ```console
@@ -31,7 +31,7 @@ When restoring the index, the snapshot needs to be decompressed using the same a
 
 ## Restoring a Snapshot
 
-Restoring snapshots is done using the `restore-index-snapshot` CLI tool, which is documented [here](https://github.com/optakt/flow-dps/blob/master/cmd/restore-index-snapshot/README.md).
+Restoring snapshots is done using the `restore-index-snapshot` CLI tool, which is documented [here](https://github.com/onflow/flow-archive/blob/master/cmd/restore-index-snapshot/README.md).
 To successfully restore the snapshot, you must specify the compression and encoding options that were used to create it.
 
 Example of restoring a gzip compressed snapshot:

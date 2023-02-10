@@ -12,11 +12,11 @@ It does not run the DPS API on its own, so the API must be started using the pro
 
 ### Components
 
-* [Loader](https://pkg.go.dev/github.com/optakt/flow-dps/service/loader) -- Loads root checkpoint and restores the contained execution state trie.
-* [Feeder](https://pkg.go.dev/github.com/optakt/flow-dps/service/feeder) -- Loads trie updates from ledger WAL in chronological order.
-* [Chain](https://pkg.go.dev/github.com/optakt/flow-dps/service/chain) -- Reads chain data from the protocol state database.
-* [Mapper](https://pkg.go.dev/github.com/optakt/flow-dps/service/mapper) -- Orchestrates the aforementioned components to build its index.
-* [Indexer](https://pkg.go.dev/github.com/optakt/flow-dps/service/index) -- Exposes read and write access to the index database.
+* [Loader](https://pkg.go.dev/github.com/onflow/flow-archive/service/loader) -- Loads root checkpoint and restores the contained execution state trie.
+* [Feeder](https://pkg.go.dev/github.com/onflow/flow-archive/service/feeder) -- Loads trie updates from ledger WAL in chronological order.
+* [Chain](https://pkg.go.dev/github.com/onflow/flow-archive/service/chain) -- Reads chain data from the protocol state database.
+* [Mapper](https://pkg.go.dev/github.com/onflow/flow-archive/service/mapper) -- Orchestrates the aforementioned components to build its index.
+* [Indexer](https://pkg.go.dev/github.com/onflow/flow-archive/service/index) -- Exposes read and write access to the index database.
 
 ## Flow DPS Live
 
@@ -31,16 +31,16 @@ All of this information is then mapped into the DPS index, which is used by the 
 
 ### Components
 
-* [GCPStreamer](https://pkg.go.dev/github.com/optakt/flow-dps/service/cloud) -- Downloads block records from a Google Cloud Storage bucket.
-* [Consensus Tracker](https://pkg.go.dev/github.com/optakt/flow-dps/service/tracker#Consensus) -- Provides access to the protocol state database of the unstaked consensus follower and to the block execution records of the execution tracker.
-* [Execution Tracker](https://pkg.go.dev/github.com/optakt/flow-dps/service/tracker#Execution) -- Reads block execution records from the GCP streamer and provides access to the state trie updates contained therein.
-* [Mapper](https://pkg.go.dev/github.com/optakt/flow-dps/service/mapper) -- Uses the aforementioned components to build its index.
-* [Indexer](https://pkg.go.dev/github.com/optakt/flow-dps/service/index) -- Exposes a Reader and a Writer which give access to the index database.
-* [DPS API](https://pkg.go.dev/github.com/optakt/flow-dps/api/dps) -- Exposes the [DPS API](./dps-api.md), and reads from the DPS index.
+* [GCPStreamer](https://pkg.go.dev/github.com/onflow/flow-archive/service/cloud) -- Downloads block records from a Google Cloud Storage bucket.
+* [Consensus Tracker](https://pkg.go.dev/github.com/onflow/flow-archive/service/tracker#Consensus) -- Provides access to the protocol state database of the unstaked consensus follower and to the block execution records of the execution tracker.
+* [Execution Tracker](https://pkg.go.dev/github.com/onflow/flow-archive/service/tracker#Execution) -- Reads block execution records from the GCP streamer and provides access to the state trie updates contained therein.
+* [Mapper](https://pkg.go.dev/github.com/onflow/flow-archive/service/mapper) -- Uses the aforementioned components to build its index.
+* [Indexer](https://pkg.go.dev/github.com/onflow/flow-archive/service/index) -- Exposes a Reader and a Writer which give access to the index database.
+* [DPS API](https://pkg.go.dev/github.com/onflow/flow-archive/api/dps) -- Exposes the [DPS API](./dps-api.md), and reads from the DPS index.
 
 ## DPS APIs
 
 The DPS API is a GRPC API that allows reading any data that was indexed by the Flow DPS, at any given height.
-The DPS API can also serve as the foundation for the [Flow Rosetta API](https://github.com/optakt/flow-dps-rosetta) and the [Flow Access API](https://github.com/optakt/flow-dps-access).
+The DPS API can also serve as the foundation for the [Flow Rosetta API](https://github.com/onflow/flow-archive-rosetta) and the [Flow Access API](https://github.com/onflow/flow-archive-access).
 
 [![DPS APIs](./svg/api.svg)](./svg/api.svg)

@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-archive/testing/mocks"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
-	"github.com/optakt/flow-dps/models/dps"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,7 +123,7 @@ func TestStreamer_Next(t *testing.T) {
 		_, err = streamer.Next()
 
 		require.Error(t, err)
-		assert.ErrorIs(t, err, dps.ErrUnavailable)
+		assert.ErrorIs(t, err, archive.ErrUnavailable)
 	})
 
 	t.Run("gets exec data from queue if it is available", func(t *testing.T) {
@@ -142,7 +141,7 @@ func TestStreamer_Next(t *testing.T) {
 		_, err = streamer.Next()
 
 		require.Error(t, err)
-		assert.ErrorIs(t, err, dps.ErrUnavailable)
+		assert.ErrorIs(t, err, archive.ErrUnavailable)
 
 		//time.Sleep(100 * time.Millisecond)
 		//assert.Failf(t, "GCP Streamer did not attempt to download record from bucket", "asda")

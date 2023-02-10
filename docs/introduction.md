@@ -48,7 +48,7 @@ $ ./flow-dps-server -i /var/flow/data/index -a localhost:5005
 ```
 
 You should now have the DPS API available at `localhost:5005`.
-It can be used in conjunction with the [Flow Rosetta API](https://github.com/optakt/flow-dps-rosetta) and the [Flow Access API](https://github.com/optakt/flow-dps-access), which both need the address to your DPS API in order to function.
+It can be used in conjunction with the [Flow Rosetta API](https://github.com/onflow/flow-archive-rosetta) and the [Flow Access API](https://github.com/onflow/flow-archive-access), which both need the address to your DPS API in order to function.
 
 ### Indexing Live Sporks
 
@@ -79,7 +79,7 @@ $ ./flow-archive-server -i /var/flow/data/index -a 172.17.0.1:5005
 
 Once the API is running, it can be used to serve other APIs as well.
 
-See the documentation of the [Flow Rosetta API](https://github.com/optakt/flow-dps-rosetta) in order to build its binary, and then run the following command:
+See the documentation of the [Flow Rosetta API](https://github.com/onflow/flow-archive-rosetta) in order to build its binary, and then run the following command:
 
 ```console
 $ ./flow-rosetta-server -a "172.17.0.1:5005" -p 8080
@@ -87,7 +87,7 @@ $ ./flow-rosetta-server -a "172.17.0.1:5005" -p 8080
 
 The `-a` argument is used to specify the address of the DPS API, and the `-p` sets the port on which the Rosetta API listens.
 
-Similarly, the [Flow Access API](https://github.com/optakt/flow-dps-access) can be run like such:
+Similarly, the [Flow Access API](https://github.com/onflow/flow-archive-access) can be run like such:
 
 ```console
 $ ./dps-access-api -a "172.17.0.1:5005" -p 5006

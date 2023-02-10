@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
-	"github.com/optakt/flow-dps/models/dps"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"math"
@@ -113,7 +112,7 @@ func (e *ExecDataSync) Next() (*execution_data.BlockExecutionData, error) {
 	// later.
 	if e.buffer.Len() == 0 {
 		e.log.Debug().Msg("buffer empty, no execution record available")
-		return nil, dps.ErrUnavailable
+		return nil, archive.ErrUnavailable
 	}
 
 	// If we have a record in the buffer, we will just return it. The buffer is
