@@ -73,10 +73,6 @@ func TestStreamer_Next(t *testing.T) {
 	_, err := cbor.Marshal(record)
 	require.NoError(t, err)
 
-	decOptions := cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}
-	decoder, err := decOptions.DecMode()
-	require.NoError(t, err)
-
 	bed, err := convert.BlockExecutionDataToMessage(record)
 	require.NoError(t, err)
 
@@ -94,7 +90,6 @@ func TestStreamer_Next(t *testing.T) {
 
 		streamer := &ExecDataSync{
 			log:         zerolog.Nop(),
-			decoder:     decoder,
 			execDataApi: mockApiClient,
 			blocks:      archive.NewDeque(),
 			records:     archive.NewDeque(),
@@ -113,7 +108,6 @@ func TestStreamer_Next(t *testing.T) {
 	t.Run("returns unavailable when no block data in buffer", func(t *testing.T) {
 		streamer := &ExecDataSync{
 			log:         zerolog.Nop(),
-			decoder:     decoder,
 			execDataApi: mockApiClient,
 			blocks:      archive.NewDeque(),
 			records:     archive.NewDeque(),
@@ -129,7 +123,6 @@ func TestStreamer_Next(t *testing.T) {
 	t.Run("gets exec data from queue if it is available", func(t *testing.T) {
 		streamer := &ExecDataSync{
 			log:         zerolog.Nop(),
-			decoder:     decoder,
 			execDataApi: mockApiClient,
 			blocks:      archive.NewDeque(),
 			records:     archive.NewDeque(),

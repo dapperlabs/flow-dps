@@ -11,7 +11,6 @@ import (
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
-	"math"
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
@@ -33,38 +32,25 @@ type ExecDataSync struct {
 }
 
 // NewExecDataSync returns a new Exec data sync object using the given AN client and options.
-func NewExecDataSync(log zerolog.Logger, execDataAddr string, client execData.ExecutionDataAPIClient, chain flow.Chain, options ...Option) *ExecDataSync {
+func NewExecDataSync(log zerolog.Logger, client execData.ExecutionDataAPIClient, chain flow.Chain, options ...Option) *ExecDataSync {
 
 	cfg := DefaultConfig
 	for _, option := range options {
 		option(&cfg)
 	}
 
-	decOptions := cbor.DecOptions{
-		ExtraReturnErrors: cbor.ExtraDecErrorUnknownField,
-		MaxArrayElements:  math.MaxUint32,
-	}
-	decoder, err := decOptions.DecMode()
-	if err != nil {
-		panic(err)
-	}
-
-	var exeDataApi execData.ExecutionDataAPIClient
-	if client == nil {
-		exeDataApi = getAPIClient(execDataAddr)
-	} else {
-		exeDataApi = client
-	}
-
 	e := ExecDataSync{
 		log:         log.With().Str("component", "exec_data_sync").Logger(),
-		decoder:     decoder,
-		execDataApi: exeDataApi,
+		execDataApi: client,
 		blocks:      archive.NewDeque(),
 		records:     archive.NewDeque(),
 		limit:       cfg.BufferSize,
 		busy:        0,
 		chain:       chain,
+	}
+
+	if client == nil {
+		e.log.Error().Msg("could not access exec data api client")
 	}
 
 	for _, blockID := range cfg.CatchupBlocks {

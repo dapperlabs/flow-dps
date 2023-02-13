@@ -18,6 +18,8 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"net"
 	"net/http"
 	"os"
@@ -75,16 +77,17 @@ func run() int {
 
 	// Command line parameter initialization.
 	var (
-		flagAddress     string
-		flagBootstrap   string
-		flagExecData    string
-		flagCheckpoint  string
-		flagData        string
-		flagIndex       string
-		flagLevel       string
-		flagMetricsAddr string
-		flagProfiling   string
-		flagSkip        bool
+		flagAddress         string
+		flagBootstrap       string
+		flagExecData        string
+		flagGRPCMessageSize uint32
+		flagCheckpoint      string
+		flagData            string
+		flagIndex           string
+		flagLevel           string
+		flagMetricsAddr     string
+		flagProfiling       string
+		flagSkip            bool
 
 		flagFlushInterval time.Duration
 		flagSeedAddress   string
@@ -96,6 +99,7 @@ func run() int {
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving Archive API")
 	pflag.StringVarP(&flagBootstrap, "bootstrap", "b", "bootstrap", "path to directory with bootstrap information for spork")
 	pflag.StringVarP(&flagExecData, "execdata", "e", "", "address for a execution state data API endpoint")
+	pflag.Uint32VarP(&flagGRPCMessageSize, "grpc-message-size", "g", 1024*1024*20, "sets the max grpc message size")
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to root checkpoint file for execution state trie")
 	pflag.StringVarP(&flagData, "data", "d", "data", "path to database directory for protocol data")
 	pflag.StringVarP(&flagIndex, "index", "i", "index", "path to database directory for state index")
@@ -281,11 +285,21 @@ func run() int {
 		return failure
 	}
 
+	// Here we initialize a GRPC connection to the execution data api client
+	// The GRPC message size is configurable by a CLI flag, and may need to be bumped up
+	// in the event of encountering very large blocks
+	MaxGRPCMessageSize := flagGRPCMessageSize
+	conn, err := grpc.Dial(flagExecData, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(MaxGRPCMessageSize))))
+	if err != nil {
+		panic(fmt.Sprintf("unable to create connection to node: %s", flagExecData))
+	}
+	execDataAPI := execData.NewExecutionDataAPIClient(conn)
+
 	// On the other side, we also need access to the execution data. The cloud
 	// streamer is responsible for retrieving block execution records from a
 	// Google Cloud Storage bucket. This component plays the role of what would
 	// otherwise be a network protocol, such as a publish socket.
-	stream := datasync.NewExecDataSync(log, flagExecData, nil, chainID, datasync.WithCatchupBlocks(blockIDs))
+	stream := datasync.NewExecDataSync(log, execDataAPI, chainID, datasync.WithCatchupBlocks(blockIDs))
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
