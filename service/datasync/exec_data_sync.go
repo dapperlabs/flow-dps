@@ -1,20 +1,20 @@
 package datasync
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
-	"sync/atomic"
-
-	"cloud.google.com/go/storage"
-	"github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/flow-archive/models/archive"
 )
@@ -29,6 +29,8 @@ type ExecDataSync struct {
 	limit       uint               // records size limit for downloaded records
 	busy        uint32             // used as a guard to avoid concurrent polling
 	chain       flow.Chain
+	*component.ComponentManager
+	pollNotifier engine.Notifier
 }
 
 // NewExecDataSync returns a new Exec data sync object using the given AN client and options.
@@ -40,18 +42,23 @@ func NewExecDataSync(log zerolog.Logger, client execData.ExecutionDataAPIClient,
 	}
 
 	e := ExecDataSync{
-		log:         log.With().Str("component", "exec_data_sync").Logger(),
-		execDataApi: client,
-		blocks:      archive.NewDeque(),
-		records:     archive.NewDeque(),
-		limit:       cfg.BufferSize,
-		busy:        0,
-		chain:       chain,
+		log:          log.With().Str("component", "exec_data_sync").Logger(),
+		execDataApi:  client,
+		blocks:       archive.NewDeque(),
+		records:      archive.NewDeque(),
+		limit:        cfg.BufferSize,
+		busy:         0,
+		chain:        chain,
+		pollNotifier: engine.NewNotifier(),
 	}
 
 	if client == nil {
 		e.log.Error().Msg("could not access exec data api client")
 	}
+
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.poll).
+		Build()
 
 	for _, blockID := range cfg.CatchupBlocks {
 		e.blocks.PushFront(blockID)
@@ -59,16 +66,6 @@ func NewExecDataSync(log zerolog.Logger, client execData.ExecutionDataAPIClient,
 	}
 
 	return &e
-}
-
-func getAPIClient(addr string) execData.ExecutionDataAPIClient {
-	// connect to Archive-Access instance
-	MaxGRPCMessageSize := 1024 * 1024 * 20 // 20MB
-	conn, err := grpc.Dial(addr, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxGRPCMessageSize)))
-	if err != nil {
-		panic(fmt.Sprintf("unable to create connection to node: %s", addr))
-	}
-	return execData.NewExecutionDataAPIClient(conn)
 }
 
 // OnBlockFinalized is a callback for the Flow consensus follower. It is called
@@ -86,12 +83,7 @@ func (e *ExecDataSync) OnBlockFinalized(block *model.Block) {
 // data is available at the moment.
 func (e *ExecDataSync) Next() (*execution_data.BlockExecutionData, error) {
 
-	// If we are not polling already, we want to start polling in the
-	// background. This will try to fill the records up until its limit is
-	// reached. It basically means that the cloud streamer will always be
-	// downloading if something is available and the execution tracker is asking
-	// for the next record.
-	go e.poll()
+	e.pollNotifier.Notify()
 
 	// If we have nothing in the records, we can return the unavailable error,
 	// which will cause the mapper logic to go into a wait state and retry a bit
@@ -108,35 +100,36 @@ func (e *ExecDataSync) Next() (*execution_data.BlockExecutionData, error) {
 	return record.(*execution_data.BlockExecutionData), nil
 }
 
-func (e *ExecDataSync) poll() {
+func (e *ExecDataSync) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	notifier := e.pollNotifier.Channel()
 
-	// We only call `Next()` sequentially, so there is no need to guard it from
-	// concurrent access. However, when the records is not empty, we might still
-	// be polling for new data in the background when the next call happens. We
-	// thus need to ensure that only one poll is executed at the same time. We
-	// do this with a simple flag that is set atomically to work like a
-	// `TryLock()` on a mutex, which is unfortunately not available in Go, see:
-	// https://github.com/golang/go/issues/6123
-	if !atomic.CompareAndSwapUint32(&e.busy, 0, 1) {
-		return
-	}
-	defer atomic.StoreUint32(&e.busy, 0)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-notifier:
+			err := e.getExecData(ctx)
+			if errors.Is(err, storage.ErrObjectNotExist) {
+				e.log.Debug().Msg("next execution record not available, download stopped")
+				return
+			}
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not download execution records")
+				return
+			}
+		}
 
-	// At this point, we try to pull new files from the cloud.
-	err := e.getExecData()
-	if errors.Is(err, storage.ErrObjectNotExist) {
-		e.log.Debug().Msg("next execution record not available, download stopped")
-		return
-	}
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not download execution records")
-		return
 	}
 }
 
-func (e *ExecDataSync) getExecData() error {
-
+func (e *ExecDataSync) getExecData(ctx context.Context) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 
 		// We only want to retrieve and process execData blocks until the records is full.
 		if uint(e.records.Len()) >= e.limit {
@@ -144,20 +137,9 @@ func (e *ExecDataSync) getExecData() error {
 			return nil
 		}
 
-		// We only want to retrieve and process files for blocks that have already
-		// been finalized, in the order that they have been finalized. This
-		// causes some latency, as we don't download until after a block is
-		// finalized, even if the data is available before. However, it seems to
-		// be the only way to make sure trie updates are delivered to the mapper
-		// in the right order without changing the way uploads work.
-		if e.blocks.Len() == 0 {
-			e.log.Debug().Msg("blocks empty, stopping execution record download")
-			return nil
-		}
-
 		// Get the name of the file based on the block ID. The file n
 		blockID := e.blocks.PopBack().(flow.Identifier)
-		record, err := e.pullData(context.Background(), blockID)
+		record, err := e.pullData(ctx, blockID)
 		if err != nil {
 			e.blocks.PushBack(blockID)
 			return fmt.Errorf("could not pull execution record (name: %s): %w", blockID, err)
@@ -168,6 +150,7 @@ func (e *ExecDataSync) getExecData() error {
 			Msg("pushing execution record into records")
 
 		e.records.PushFront(record)
+		return nil
 	}
 }
 
