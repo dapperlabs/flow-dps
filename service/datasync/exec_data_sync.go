@@ -122,13 +122,10 @@ func (e *ExecDataSync) poll(ctx irrecoverable.SignalerContext, ready component.R
 }
 
 func (e *ExecDataSync) getExecData(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
 		// We only want to retrieve and process execData blocks until the records is full.
 		if uint(e.records.Len()) >= e.limit {
 			e.log.Debug().Uint("limit", e.limit).Msg("records full, stopping execution record pull")
