@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -22,7 +21,6 @@ import (
 // ExecDataSync is a component to retrieve execution data from a trusted access node API instead of the GCPStreamer
 type ExecDataSync struct {
 	log         zerolog.Logger
-	decoder     cbor.DecMode
 	execDataApi execData.ExecutionDataAPIClient
 	blocks      *archive.SafeDeque // blocks of block identifiers for next downloads
 	records     *archive.SafeDeque // blocks of downloaded execution data records

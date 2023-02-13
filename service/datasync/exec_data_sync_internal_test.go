@@ -17,7 +17,6 @@ import (
 
 func TestNewExecDataSync(t *testing.T) {
 	log := zerolog.Nop()
-	accessNode := "mock.access-node.url"
 	limit := uint(42)
 	blockIDs := mocks.GenericBlockIDs(4)
 
@@ -35,7 +34,6 @@ func TestNewExecDataSync(t *testing.T) {
 
 	streamer := NewExecDataSync(
 		log,
-		accessNode,
 		mockApiClient,
 		flow.Testnet.Chain(),
 		WithBufferSize(limit),
