@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"google.golang.org/grpc/credentials/insecure"
 	"net"
 	"net/http"
 	"os"
@@ -81,6 +82,7 @@ func run() int {
 		flagBootstrap       string
 		flagExecData        string
 		flagGRPCMessageSize uint32
+		flagGRPCInsecure    bool
 		flagCheckpoint      string
 		flagData            string
 		flagIndex           string
@@ -100,6 +102,7 @@ func run() int {
 	pflag.StringVarP(&flagBootstrap, "bootstrap", "b", "bootstrap", "path to directory with bootstrap information for spork")
 	pflag.StringVarP(&flagExecData, "execdata", "e", "", "address for a execution state data API endpoint")
 	pflag.Uint32VarP(&flagGRPCMessageSize, "grpc-message-size", "g", 1024*1024*20, "sets the max grpc message size")
+	pflag.BoolVarP(&flagGRPCInsecure, "grpc-insecure-allowed", "", false, "flag to allow insecure connections")
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to root checkpoint file for execution state trie")
 	pflag.StringVarP(&flagData, "data", "d", "data", "path to database directory for protocol data")
 	pflag.StringVarP(&flagIndex, "index", "i", "index", "path to database directory for state index")
@@ -289,7 +292,11 @@ func run() int {
 	// The GRPC message size is configurable by a CLI flag, and may need to be bumped up
 	// in the event of encountering very large blocks
 	MaxGRPCMessageSize := flagGRPCMessageSize
-	conn, err := grpc.Dial(flagExecData, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(MaxGRPCMessageSize))))
+	opts := []grpc.DialOption{grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(MaxGRPCMessageSize)))}
+	if flagGRPCInsecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+	conn, err := grpc.Dial(flagExecData, opts...)
 	if err != nil {
 		panic(fmt.Sprintf("unable to create connection to node: %s", flagExecData))
 	}
