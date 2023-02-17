@@ -25,7 +25,6 @@ type ExecDataSync struct {
 	blocks      *archive.SafeDeque // queue of block identifiers for next downloads
 	records     *archive.SafeDeque // queue of downloaded execution data records
 	limit       uint               // records size limit for downloaded records
-	busy        uint32             // used as a guard to avoid concurrent polling
 	chain       flow.Chain
 	*component.ComponentManager
 	pollNotifier engine.Notifier
@@ -45,7 +44,6 @@ func NewExecDataSync(log zerolog.Logger, client execData.ExecutionDataAPIClient,
 		blocks:       archive.NewDeque(),
 		records:      archive.NewDeque(),
 		limit:        cfg.BufferSize,
-		busy:         0,
 		chain:        chain,
 		pollNotifier: engine.NewNotifier(),
 	}
