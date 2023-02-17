@@ -22,8 +22,8 @@ import (
 type ExecDataSync struct {
 	log         zerolog.Logger
 	execDataApi execData.ExecutionDataAPIClient
-	blocks      *archive.SafeDeque // blocks of block identifiers for next downloads
-	records     *archive.SafeDeque // blocks of downloaded execution data records
+	blocks      *archive.SafeDeque // queue of block identifiers for next downloads
+	records     *archive.SafeDeque // queue of downloaded execution data records
 	limit       uint               // records size limit for downloaded records
 	busy        uint32             // used as a guard to avoid concurrent polling
 	chain       flow.Chain

@@ -281,7 +281,7 @@ func run() int {
 
 	// If we are resuming, and the consensus follower has already finalized some
 	// blocks that were not yet indexed, we need to download them again in the
-	// cloud streamer. Here, we figure out which blocks these are.
+	// exec data sync client. Here, we figure out which blocks these are.
 	blockIDs, err := initializer.CatchupBlocks(protocolDB, read)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize catch-up blocks")
@@ -302,17 +302,15 @@ func run() int {
 	}
 	execDataAPI := execData.NewExecutionDataAPIClient(conn)
 
-	// On the other side, we also need access to the execution data. The cloud
-	// streamer is responsible for retrieving block execution records from a
-	// Google Cloud Storage bucket. This component plays the role of what would
-	// otherwise be a network protocol, such as a publish socket.
-	stream := datasync.NewExecDataSync(log, execDataAPI, chainID, datasync.WithCatchupBlocks(blockIDs))
+	// On the other side, we also need access to the execution data. The exec data sync client is responsible
+	// for retrieving block execution data from a trusted AN through the polling API
+	execDataSyncClient := datasync.NewExecDataSync(log, execDataAPI, chainID, datasync.WithCatchupBlocks(blockIDs))
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
-	// follower and related consensus data on one side, and the cloud streamer
+	// follower and related consensus data on one side, and the exec data sync client
 	// and available execution records on the other side.
-	execution, err := tracker.NewExecution(log, protocolDB, stream)
+	execution, err := tracker.NewExecution(log, protocolDB, execDataSyncClient)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize execution tracker")
 		return failure
@@ -323,12 +321,12 @@ func run() int {
 		return failure
 	}
 
-	// We can now register the consensus tracker and the cloud streamer as
+	// We can now register the consensus tracker and the exec data sync client as
 	// finalization listeners with the consensus follower. The consensus tracker
 	// will use the callback to make additional data available to the mapper,
-	// while the cloud streamer will use the callback to download execution data
+	// while the exec data sync client will use the callback to download execution data
 	// for finalized blocks.
-	follow.AddOnBlockFinalizedConsumer(stream.OnBlockFinalized)
+	follow.AddOnBlockFinalizedConsumer(execDataSyncClient.OnBlockFinalized)
 	follow.AddOnBlockFinalizedConsumer(consensus.OnBlockFinalized)
 
 	// If we have an empty database, we want a loader to bootstrap from the
