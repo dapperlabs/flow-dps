@@ -16,6 +16,7 @@ package tracker
 
 import (
 	"fmt"
+	"github.com/onflow/flow-archive/models/archive"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/gammazero/deque"
@@ -32,12 +33,11 @@ import (
 // streamer and extracts the trie updates for consumers. It also makes the rest
 // of the block record data available for external consumers by block ID.
 type Execution struct {
-	log       zerolog.Logger
-	queue     *deque.Deque
-	stream    RecordStreamer
-	db        *badger.DB
-	records   map[flow.Identifier]*execution_data.BlockExecutionData
-	heightMap map[flow.Identifier]uint64
+	log     zerolog.Logger
+	queue   *deque.Deque
+	stream  RecordStreamer
+	db      *badger.DB
+	records map[flow.Identifier]*archive.BlockExecutionDataRecord
 }
 
 // NewExecution creates a new DPS execution follower, relying on the provided
@@ -74,21 +74,24 @@ func NewExecution(log zerolog.Logger, db *badger.DB, stream RecordStreamer) (*Ex
 	}
 
 	e := Execution{
-		log:       log.With().Str("component", "execution_tracker").Logger(),
-		stream:    stream,
-		queue:     deque.New(),
-		db:        db,
-		records:   make(map[flow.Identifier]*execution_data.BlockExecutionData),
-		heightMap: make(map[flow.Identifier]uint64),
+		log:     log.With().Str("component", "execution_tracker").Logger(),
+		stream:  stream,
+		queue:   deque.New(),
+		db:      db,
+		records: make(map[flow.Identifier]*archive.BlockExecutionDataRecord),
 	}
 
-	record := execution_data.BlockExecutionData{
+	execData := execution_data.BlockExecutionData{
 		BlockID:             blockID,
 		ChunkExecutionDatas: nil,
 	}
 
-	e.records[blockID] = &record
-	e.heightMap[blockID] = header.Height
+	bedRecord := archive.BlockExecutionDataRecord{
+		ExecutionData: &execData,
+		Height:        header.Height,
+	}
+
+	e.records[blockID] = &bedRecord
 
 	return &e, nil
 }
@@ -127,8 +130,8 @@ func (e *Execution) Record(blockID flow.Identifier) (*execution_data.BlockExecut
 	// consumer.
 	record, ok := e.records[blockID]
 	if ok {
-		e.purge(e.heightMap[blockID])
-		return record, nil
+		e.purge(record.Height)
+		return record.ExecutionData, nil
 	}
 
 	// Get the next block data available from the execution follower and process
@@ -148,30 +151,33 @@ func (e *Execution) Record(blockID flow.Identifier) (*execution_data.BlockExecut
 func (e *Execution) processNext() error {
 
 	// Get the next block execution record available from the cloud streamer.
-	record, err := e.stream.Next()
+	execData, err := e.stream.Next()
 	if err != nil {
 		return fmt.Errorf("could not read next execution record: %w", err)
 	}
 
 	// Check if we already processed a block with this ID recently. This should
 	// be idempotent, but we should be aware if something like this happens.
-	blockID := record.BlockID
+	blockID := execData.BlockID
 	_, ok := e.records[blockID]
 	if ok {
 		return fmt.Errorf("duplicate execution record (block: %x)", blockID)
 	}
-
-	// Dump the block execution record into our cache and push all trie updates
-	// into our update queue.
-	e.records[blockID] = record
 	var header flow.Header
 	err = e.db.View(operation.RetrieveHeader(blockID, &header))
 	if err != nil {
 		return fmt.Errorf("could not retrieve root header: %w", err)
 	}
-	e.heightMap[blockID] = header.Height
+	record := archive.BlockExecutionDataRecord{
+		ExecutionData: execData,
+		Height:        header.Height,
+	}
+
+	// Dump the block execution record into our cache and push all trie updates
+	// into our update queue.
+	e.records[blockID] = &record
 	recordCount := 0
-	for _, ced := range record.ChunkExecutionDatas {
+	for _, ced := range execData.ChunkExecutionDatas {
 		update := ced.TrieUpdate
 		// The Flow execution node includes `nil` updates in the slice, instead
 		// of empty updates. We could fix this here, but we don't have the root
@@ -194,9 +200,8 @@ func (e *Execution) processNext() error {
 // purge deletes all records that are below the specified height threshold.
 func (e *Execution) purge(threshold uint64) {
 	for blockID := range e.records {
-		if e.heightMap[blockID] < threshold {
+		if e.records[blockID].Height < threshold {
 			delete(e.records, blockID)
-			delete(e.heightMap, blockID)
 		}
 	}
 }

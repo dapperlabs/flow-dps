@@ -15,6 +15,7 @@
 package tracker
 
 import (
+	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"testing"
 
@@ -60,8 +61,6 @@ func TestNewExecution(t *testing.T) {
 		stream := mocks.BaselineRecordStreamer(t)
 
 		db := helpers.InMemoryDB(t)
-		// Do not insert root height.
-		//require.NoError(t, db.Update(operation.InsertRootHeight(header.Height)))
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, blockID)))
 		require.NoError(t, db.Update(operation.InsertHeader(blockID, header)))
 		require.NoError(t, db.Update(operation.IndexLatestSealAtBlock(blockID, seal.ID())))
@@ -96,8 +95,6 @@ func TestNewExecution(t *testing.T) {
 		db := helpers.InMemoryDB(t)
 		require.NoError(t, db.Update(operation.InsertRootHeight(header.Height)))
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, blockID)))
-		// Do not insert header.
-		//require.NoError(t, db.Update(operation.InsertHeader(blockID, header)))
 		require.NoError(t, db.Update(operation.IndexLatestSealAtBlock(blockID, seal.ID())))
 		require.NoError(t, db.Update(operation.InsertSeal(seal.ID(), seal)))
 
@@ -114,8 +111,6 @@ func TestNewExecution(t *testing.T) {
 		require.NoError(t, db.Update(operation.InsertRootHeight(header.Height)))
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, blockID)))
 		require.NoError(t, db.Update(operation.InsertHeader(blockID, header)))
-		// Do not insert seal ID.
-		//require.NoError(t, db.Update(operation.IndexBlockSeal(blockID, seal.ID())))
 		require.NoError(t, db.Update(operation.InsertSeal(seal.ID(), seal)))
 
 		_, err := NewExecution(log, db, stream)
@@ -132,8 +127,6 @@ func TestNewExecution(t *testing.T) {
 		require.NoError(t, db.Update(operation.IndexBlockHeight(header.Height, blockID)))
 		require.NoError(t, db.Update(operation.InsertHeader(blockID, header)))
 		require.NoError(t, db.Update(operation.IndexLatestSealAtBlock(blockID, seal.ID())))
-		// Do not insert seal.
-		// require.NoError(t, db.Update(operation.InsertSeal(seal.ID(), seal)))
 
 		_, err := NewExecution(log, db, stream)
 
@@ -150,98 +143,69 @@ func TestExecution_Purge(t *testing.T) {
 		{BlockID: blockIDs[3], ChunkExecutionDatas: nil},
 	}
 	blockHeights := []uint64{4, 5, 6, 7}
+	records := []*archive.BlockExecutionDataRecord{
+		{ExecutionData: blocks[0], Height: blockHeights[0]},
+		{ExecutionData: blocks[1], Height: blockHeights[1]},
+		{ExecutionData: blocks[2], Height: blockHeights[2]},
+		{ExecutionData: blocks[3], Height: blockHeights[3]},
+	}
 
 	tests := []struct {
-		name string
-
-		threshold    uint64
-		before       map[flow.Identifier]*execution_data.BlockExecutionData
-		heightBefore map[flow.Identifier]uint64
-
-		after       map[flow.Identifier]*execution_data.BlockExecutionData
-		heightAfter map[flow.Identifier]uint64
+		name      string
+		threshold uint64
+		before    map[flow.Identifier]*archive.BlockExecutionDataRecord
+		after     map[flow.Identifier]*archive.BlockExecutionDataRecord
 	}{
 		{
 			name: "threshold is at lowest height",
 
 			threshold: blockHeights[0],
-			before: map[flow.Identifier]*execution_data.BlockExecutionData{
-				blockIDs[0]: blocks[0],
-				blockIDs[1]: blocks[1],
-				blockIDs[2]: blocks[2],
-				blockIDs[3]: blocks[3],
+			before: map[flow.Identifier]*archive.BlockExecutionDataRecord{
+				blockIDs[0]: records[0],
+				blockIDs[1]: records[1],
+				blockIDs[2]: records[2],
+				blockIDs[3]: records[3],
 			},
-			heightBefore: map[flow.Identifier]uint64{
-				blockIDs[0]: blockHeights[0],
-				blockIDs[1]: blockHeights[1],
-				blockIDs[2]: blockHeights[2],
-				blockIDs[3]: blockHeights[3],
-			},
-			after: map[flow.Identifier]*execution_data.BlockExecutionData{
-				blockIDs[0]: blocks[0],
-				blockIDs[1]: blocks[1],
-				blockIDs[2]: blocks[2],
-				blockIDs[3]: blocks[3],
-			},
-			heightAfter: map[flow.Identifier]uint64{
-				blockIDs[0]: blockHeights[0],
-				blockIDs[1]: blockHeights[1],
-				blockIDs[2]: blockHeights[2],
-				blockIDs[3]: blockHeights[3],
+			after: map[flow.Identifier]*archive.BlockExecutionDataRecord{
+				blockIDs[0]: records[0],
+				blockIDs[1]: records[1],
+				blockIDs[2]: records[2],
+				blockIDs[3]: records[3],
 			},
 		},
 		{
 			name: "threshold is above highest height",
 
 			threshold: blockHeights[3] + 1,
-			before: map[flow.Identifier]*execution_data.BlockExecutionData{
-				blockIDs[0]: blocks[0],
-				blockIDs[1]: blocks[1],
-				blockIDs[2]: blocks[2],
-				blockIDs[3]: blocks[3],
+			before: map[flow.Identifier]*archive.BlockExecutionDataRecord{
+				blockIDs[0]: records[0],
+				blockIDs[1]: records[1],
+				blockIDs[2]: records[2],
+				blockIDs[3]: records[3],
 			},
-			heightBefore: map[flow.Identifier]uint64{
-				blockIDs[0]: blockHeights[0],
-				blockIDs[1]: blockHeights[1],
-				blockIDs[2]: blockHeights[2],
-				blockIDs[3]: blockHeights[3],
-			},
-			after:       map[flow.Identifier]*execution_data.BlockExecutionData{},
-			heightAfter: map[flow.Identifier]uint64{},
+			after: map[flow.Identifier]*archive.BlockExecutionDataRecord{},
 		},
 		{
 			name: "threshold is in-between",
 
 			threshold: blockHeights[2],
-			before: map[flow.Identifier]*execution_data.BlockExecutionData{
-				blockIDs[0]: blocks[0],
-				blockIDs[1]: blocks[1],
-				blockIDs[2]: blocks[2],
-				blockIDs[3]: blocks[3],
+			before: map[flow.Identifier]*archive.BlockExecutionDataRecord{
+				blockIDs[0]: records[0],
+				blockIDs[1]: records[1],
+				blockIDs[2]: records[2],
+				blockIDs[3]: records[3],
 			},
-			heightBefore: map[flow.Identifier]uint64{
-				blockIDs[0]: blockHeights[0],
-				blockIDs[1]: blockHeights[1],
-				blockIDs[2]: blockHeights[2],
-				blockIDs[3]: blockHeights[3],
-			},
-			after: map[flow.Identifier]*execution_data.BlockExecutionData{
-				blockIDs[2]: blocks[2],
-				blockIDs[3]: blocks[3],
-			},
-			heightAfter: map[flow.Identifier]uint64{
-				blockIDs[2]: blockHeights[2],
-				blockIDs[3]: blockHeights[3],
+			after: map[flow.Identifier]*archive.BlockExecutionDataRecord{
+				blockIDs[2]: records[2],
+				blockIDs[3]: records[3],
 			},
 		},
 		{
 			name: "does nothing when there is nothing to purge",
 
-			threshold:    blockHeights[2],
-			before:       map[flow.Identifier]*execution_data.BlockExecutionData{},
-			heightBefore: map[flow.Identifier]uint64{},
-			after:        map[flow.Identifier]*execution_data.BlockExecutionData{},
-			heightAfter:  map[flow.Identifier]uint64{},
+			threshold: blockHeights[2],
+			before:    map[flow.Identifier]*archive.BlockExecutionDataRecord{},
+			after:     map[flow.Identifier]*archive.BlockExecutionDataRecord{},
 		},
 	}
 
@@ -253,12 +217,8 @@ func TestExecution_Purge(t *testing.T) {
 
 			exec := BaselineExecution(t)
 			exec.records = test.before
-			exec.heightMap = test.heightBefore
-
 			exec.purge(test.threshold)
-
 			assert.Len(t, exec.records, len(test.after))
-			assert.Len(t, exec.heightMap, len(test.heightAfter))
 			assert.Equal(t, test.after, exec.records)
 		})
 	}
@@ -269,11 +229,10 @@ func BaselineExecution(t *testing.T, opts ...func(*Execution)) *Execution {
 	t.Helper()
 
 	e := Execution{
-		log:       zerolog.Nop(),
-		queue:     deque.New(),
-		stream:    mocks.BaselineRecordStreamer(t),
-		records:   make(map[flow.Identifier]*execution_data.BlockExecutionData),
-		heightMap: make(map[flow.Identifier]uint64),
+		log:     zerolog.Nop(),
+		queue:   deque.New(),
+		stream:  mocks.BaselineRecordStreamer(t),
+		records: make(map[flow.Identifier]*archive.BlockExecutionDataRecord),
 	}
 
 	for _, opt := range opts {
