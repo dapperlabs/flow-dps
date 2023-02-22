@@ -192,7 +192,7 @@ func (r *Reader) Result(txID flow.Identifier) (*flow.TransactionResult, error) {
 }
 
 // Events returns the events of all transactions that were part of the
-// finalized block at the given height. It can optionally filter them by event
+// executed block at the given height. It can optionally filter them by event
 // type; if no event types are given, all events are returned.
 func (r *Reader) Events(height uint64, types ...flow.EventType) ([]flow.Event, error) {
 	first, err := r.First()
@@ -223,14 +223,14 @@ func (r *Reader) Seal(sealID flow.Identifier) (*flow.Seal, error) {
 	return &seal, err
 }
 
-// SealsByHeight returns all of the seals that were part of the finalized block at the given height.
+// SealsByHeight returns all of the seals that were part of the executed block at the given height.
 func (r *Reader) SealsByHeight(height uint64) ([]flow.Identifier, error) {
 	var sealIDs []flow.Identifier
 	err := r.db.View(r.lib.LookupSealsForHeight(height, &sealIDs))
 	return sealIDs, err
 }
 
-// PathsByHeight returns all of the payload paths that were part of the finalized block at the given height
+// PathsByHeight returns all of the payload paths that were part of the executed block at the given height
 func (r *Reader) PathsByHeight(height uint64) ([]ledger.Path, error) {
 	var paths []ledger.Path
 	err := r.db.View(r.lib.LookupPayloadPathsForHeight(height, &paths))

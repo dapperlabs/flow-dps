@@ -1,9 +1,7 @@
 package datasync
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
@@ -14,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-archive/models/archive"
 )
@@ -106,7 +106,7 @@ func (e *ExecDataSync) poll(ctx irrecoverable.SignalerContext, ready component.R
 			return
 		case <-notifier:
 			err := e.getExecData(ctx)
-			if errors.Is(err, storage.ErrObjectNotExist) {
+			if status.Code(err) == codes.NotFound {
 				e.log.Debug().Msg("next execution record not available, download stopped")
 				return
 			}
@@ -120,30 +120,34 @@ func (e *ExecDataSync) poll(ctx irrecoverable.SignalerContext, ready component.R
 }
 
 func (e *ExecDataSync) getExecData(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return nil
-	default:
-		// We only want to retrieve and process execData blocks until the records is full.
-		if uint(e.records.Len()) >= e.limit {
-			e.log.Debug().Uint("limit", e.limit).Msg("records full, stopping execution record pull")
+	for {
+		select {
+		case <-ctx.Done():
 			return nil
+		default:
+			// We only want to retrieve and process execData blocks until the records is full.
+			if uint(e.records.Len()) >= e.limit {
+				e.log.Debug().Uint("limit", e.limit).Msg("records full, stopping execution record pull")
+				return nil
+			}
+
+			if e.blocks.Len() == 0 {
+				continue
+			}
+			// get the id of the next block in our queue that we wil be polling data for
+			blockID := e.blocks.PopBack().(flow.Identifier)
+			record, err := e.pullData(ctx, blockID)
+			if err != nil {
+				e.blocks.PushBack(blockID)
+				return fmt.Errorf("could not pull execution record (name: %s): %w", blockID, err)
+			}
+
+			e.log.Debug().
+				Hex("blockID", blockID[:]).
+				Msg("pushing execution record into records")
+
+			e.records.PushFront(record)
 		}
-
-		// Get the name of the file based on the block ID. The file n
-		blockID := e.blocks.PopBack().(flow.Identifier)
-		record, err := e.pullData(ctx, blockID)
-		if err != nil {
-			e.blocks.PushBack(blockID)
-			return fmt.Errorf("could not pull execution record (name: %s): %w", blockID, err)
-		}
-
-		e.log.Debug().
-			Hex("blockID", blockID[:]).
-			Msg("pushing execution record into records")
-
-		e.records.PushFront(record)
-		return nil
 	}
 }
 
