@@ -78,18 +78,18 @@ func run() int {
 
 	// Command line parameter initialization.
 	var (
-		flagAddress         string
-		flagBootstrap       string
-		flagExecData        string
-		flagGRPCMessageSize uint32
-		flagGRPCInsecure    bool
-		flagCheckpoint      string
-		flagData            string
-		flagIndex           string
-		flagLevel           string
-		flagMetricsAddr     string
-		flagProfiling       string
-		flagSkip            bool
+		flagAddress            string
+		flagBootstrap          string
+		flagExecData           string
+		flagGRPCMaxMessageSize uint32
+		flagGRPCInsecure       bool
+		flagCheckpoint         string
+		flagData               string
+		flagIndex              string
+		flagLevel              string
+		flagMetricsAddr        string
+		flagProfiling          string
+		flagSkip               bool
 
 		flagFlushInterval time.Duration
 		flagSeedAddress   string
@@ -101,7 +101,7 @@ func run() int {
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving Archive API")
 	pflag.StringVarP(&flagBootstrap, "bootstrap", "b", "bootstrap", "path to directory with bootstrap information for spork")
 	pflag.StringVarP(&flagExecData, "execdata", "e", "", "address for a execution state data API endpoint")
-	pflag.Uint32VarP(&flagGRPCMessageSize, "grpc-message-size", "g", 1024*1024*20, "sets the max grpc message size")
+	pflag.Uint32VarP(&flagGRPCMaxMessageSize, "grpc-max-message-size", "g", 1024*1024*20, "sets the max grpc message size")
 	pflag.BoolVarP(&flagGRPCInsecure, "grpc-insecure-allowed", "", false, "flag to allow insecure connections")
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to root checkpoint file for execution state trie")
 	pflag.StringVarP(&flagData, "data", "d", "data", "path to database directory for protocol data")
@@ -291,7 +291,7 @@ func run() int {
 	// Here we initialize a GRPC connection to the execution data api client
 	// The GRPC message size is configurable by a CLI flag, and may need to be bumped up
 	// in the event of encountering very large blocks
-	MaxGRPCMessageSize := flagGRPCMessageSize
+	MaxGRPCMessageSize := flagGRPCMaxMessageSize
 	opts := []grpc.DialOption{grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(MaxGRPCMessageSize)))}
 	if flagGRPCInsecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
