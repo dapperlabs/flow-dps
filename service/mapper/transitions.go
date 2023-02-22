@@ -143,24 +143,6 @@ func (t *Transitions) ResumeIndexing(s *State) error {
 		return fmt.Errorf("could not get last height: %w", err)
 	}
 
-	// When resuming, the loader injected into the mapper rebuilds the trie from
-	// the paths and payloads stored in the index database.
-	tree, err := t.load.Trie()
-	if err != nil {
-		return fmt.Errorf("could not restore index trie: %w", err)
-	}
-
-	// After loading the trie, we should do a sanity check on its hash against
-	// the commit we indexed for it.
-	hash := flow.StateCommitment(tree.RootHash())
-	commit, err := t.read.Commit(last)
-	if err != nil {
-		return fmt.Errorf("could not get last commit: %w", err)
-	}
-	if hash != commit {
-		return fmt.Errorf("restored trie hash does not match last commit (hash: %x, commit: %x)", hash, commit)
-	}
-
 	// Lastly, we just need to point to the next height. The chain indexing will
 	// then proceed with the first non-indexed block and forward the state
 	// commitments accordingly.
@@ -279,7 +261,7 @@ func (t *Transitions) UpdateTree(s *State) error {
 		return err
 	}
 	for _, key := range paths {
-		if s.registers[key] == nil {
+		if _, ok := s.registers[key]; !ok {
 			s.status = StatusMap
 			return nil
 		}

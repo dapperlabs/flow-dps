@@ -792,7 +792,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 	header := mocks.GenericHeader
 	tree := mocks.GenericTrie
 	commit := flow.StateCommitment(tree.RootHash())
-	differentCommit := mocks.GenericCommit(0)
 
 	t.Run("nominal case", func(t *testing.T) {
 		t.Parallel()
@@ -933,108 +932,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 		}
 		reader.CommitFunc = func(uint64) (flow.StateCommitment, error) {
 			return commit, nil
-		}
-
-		tr, st := baselineFSM(
-			t,
-			StatusResume,
-			withReader(reader),
-			withLoader(loader),
-			withChain(chain),
-		)
-
-		err := tr.ResumeIndexing(st)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles reader failure on Commit", func(t *testing.T) {
-		t.Parallel()
-
-		chain := mocks.BaselineChain(t)
-		chain.RootFunc = func() (uint64, error) {
-			return header.Height, nil
-		}
-
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return tree, nil
-		}
-
-		reader := mocks.BaselineReader(t)
-		reader.LastFunc = func() (uint64, error) {
-			return header.Height, nil
-		}
-		reader.CommitFunc = func(uint64) (flow.StateCommitment, error) {
-			return flow.DummyStateCommitment, mocks.GenericError
-		}
-
-		tr, st := baselineFSM(
-			t,
-			StatusResume,
-			withReader(reader),
-			withLoader(loader),
-			withChain(chain),
-		)
-
-		err := tr.ResumeIndexing(st)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles loader failure on Trie", func(t *testing.T) {
-		t.Parallel()
-
-		chain := mocks.BaselineChain(t)
-		chain.RootFunc = func() (uint64, error) {
-			return header.Height, nil
-		}
-
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return nil, mocks.GenericError
-		}
-
-		reader := mocks.BaselineReader(t)
-		reader.LastFunc = func() (uint64, error) {
-			return header.Height, nil
-		}
-		reader.CommitFunc = func(uint64) (flow.StateCommitment, error) {
-			return commit, nil
-		}
-
-		tr, st := baselineFSM(
-			t,
-			StatusResume,
-			withReader(reader),
-			withLoader(loader),
-			withChain(chain),
-		)
-
-		err := tr.ResumeIndexing(st)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("handles mismatch between tree root hash and indexed commit", func(t *testing.T) {
-		t.Parallel()
-
-		chain := mocks.BaselineChain(t)
-		chain.RootFunc = func() (uint64, error) {
-			return header.Height, nil
-		}
-
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return tree, nil
-		}
-
-		reader := mocks.BaselineReader(t)
-		reader.LastFunc = func() (uint64, error) {
-			return header.Height, nil
-		}
-		reader.CommitFunc = func(uint64) (flow.StateCommitment, error) {
-			return differentCommit, nil
 		}
 
 		tr, st := baselineFSM(
