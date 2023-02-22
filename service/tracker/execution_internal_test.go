@@ -142,13 +142,6 @@ func TestNewExecution(t *testing.T) {
 }
 
 func TestExecution_Purge(t *testing.T) {
-	//blocks := []*entities.BlockExecutionData{
-	//	{Block: &flow.Block{Header: &flow.Header{Height: 4}}},
-	//	{Block: &flow.Block{Header: &flow.Header{Height: 5}}},
-	//	{Block: &flow.Block{Header: &flow.Header{Height: 6}}},
-	//	{Block: &flow.Block{Header: &flow.Header{Height: 7}}},
-	//}
-
 	blockIDs := mocks.GenericBlockIDs(4)
 	blocks := []*execution_data.BlockExecutionData{
 		{BlockID: blockIDs[0], ChunkExecutionDatas: nil},

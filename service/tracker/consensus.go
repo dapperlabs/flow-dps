@@ -200,9 +200,6 @@ func (c *Consensus) Collections(height uint64, chain flow.Chain) ([]*flow.LightC
 
 	collections := make([]*flow.LightCollection, 0, len(record.ChunkExecutionDatas))
 	for _, ced := range record.ChunkExecutionDatas {
-		if err != nil {
-			return nil, fmt.Errorf("could not convert record: %w", err)
-		}
 		nextLightCollection := ced.Collection.Light()
 		collections = append(collections, &nextLightCollection)
 	}
@@ -231,10 +228,6 @@ func (c *Consensus) Transactions(height uint64, chain flow.Chain) ([]*flow.Trans
 
 	transactions := make([]*flow.TransactionBody, 0)
 	for _, ced := range record.ChunkExecutionDatas {
-		if err != nil {
-			return nil, fmt.Errorf("could not convert record: %w", err)
-		}
-
 		transactionsToAdd := ced.Collection.Transactions
 		transactions = append(transactions, transactionsToAdd...)
 	}
@@ -287,10 +280,6 @@ func (c *Consensus) Events(height uint64) ([]flow.Event, error) {
 
 	for _, chunk := range record.ChunkExecutionDatas {
 		events = append(events, chunk.Events...)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("could not get record: %w", err)
 	}
 
 	return events, nil

@@ -179,9 +179,6 @@ func (e *Execution) processNext() error {
 		if update == nil {
 			continue
 		}
-		if err != nil {
-			return fmt.Errorf("could not convert trie update: %w", err)
-		}
 		e.queue.PushFront(ced.TrieUpdate)
 		recordCount++
 	}
