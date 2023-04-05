@@ -108,6 +108,14 @@ func run() int {
 
 	pflag.Parse()
 
+	// TODO(leo): add startup reporting
+	// on startup, it's useful to print the actual value of all the flags for debugging purpose.
+	// on startup, it's useful to print the current state, such as:
+	// - whether the database has been bootstrapped
+	// - the last indexed height (since the FSM will continue from last indexed height and index the next, useful for debugging when indexing is halt)
+	// - the last finalized height (since the follower engine will continue finalize from this height, and useful for debugging when finalization is halt)
+	// - report metrics with the current state
+
 	// Increase the GOMAXPROCS value in order to use the full IOPS available, see:
 	// https://groups.google.com/g/golang-nuts/c/jPb_h3TvlKE
 	_ = runtime.GOMAXPROCS(128)
@@ -291,6 +299,19 @@ func run() int {
 		log.Error().Err(err).Msg("could not initialize execution tracker")
 		return failure
 	}
+	// TODO(leo): use follower state to retrive block data
+	// this creates a consensus tracker in order to retrieve finalized
+	// blocks by height. This is not recommended, because finalized blocks
+	// and sealed blocks should be retrieved from protocol state, rather than
+	// retrieving from database (protocolDB) directy.
+	// the question is: how to get the protocol state, the consensus follower
+	// is supposed to sync blocks from peers and use consensus algorithm to finalize
+	// blocks, which means the follower creates a protocol state internally,
+	// which is called follower state. The follower state is the correct module
+	// to retrieve finalized or sealed blocks by height.
+	// However, the consensus follower didn't expose the follower state, it's better
+	// that to adjust the consensus follower creation function to return follower state
+	// module as well.
 	consensus, err := tracker.NewConsensus(log, protocolDB, execution)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize consensus tracker")
@@ -302,6 +323,15 @@ func run() int {
 	// will use the callback to make additional data available to the mapper,
 	// while the cloud streamer will use the callback to download execution data
 	// for finalized blocks.
+	// TODO(leo): use jobqueue
+	// here, callbacks are used to notify stream (trie updates downloader) that
+	// a new finalized block can be downloaded.
+	// this wouldn't be a problem until indexing speed is behind, in which case,
+	// there will be lots of finalized and un-indexed blocks buffered in memory, and
+	// potentially causing OOM. A better way is to notify the latest finalized height only
+	// and only pre-fetch up to a certain distance. Such job-queue has been implemented in
+	// [jobqueue](https://github.com/onflow/flow-go/blob/master/module/jobqueue/README.md)
+	// the jobqueue also allows concurrently working on multiple blocks
 	follow.AddOnBlockFinalizedConsumer(stream.OnBlockFinalized)
 	follow.AddOnBlockFinalizedConsumer(consensus.OnBlockFinalized)
 
@@ -310,15 +340,42 @@ func run() int {
 	writer := archive.Writer(write)
 	metricsEnabled := flagMetricsAddr != ""
 	if metricsEnabled {
+		// TODO(leo): add metrics for finalized height, and trie updates download
+		// the indexer depends on the stream (trie updates downloader) and consensus follower (blocks downloader)
+		// to fetch the data to be indexed.
+		// the stream, the consensus follower and the indexer are all working independently.
+		// therefore, we need to monitor the progress of each module independently as well.
+		// however here, the metrics is currently only added to the writer (the indexer).
+		// it should also be added other modules in order to monitor changes in finalized height and indexed height
+		// as well as the trie updates downloading activities.
 		writer = metrics.NewMetricsWriter(write)
 	}
 
 	// At this point, we can initialize the core business logic of the indexer,
 	// with the mapper's finite state machine and transitions. We also want to
 	// load and inject the root checkpoint if it is given as a parameter.
+	// TODO(leo): use follower state
+	// the write will index both the block and trie updates for each block,
+	// actually, it is not necessary to index the block for the finalized height, because
+	// protocol state has already indexed the block by height.
+	// in other words, indexing the block would be creating a duplicated index.
+	// We could implement the read so that the block is read from the protocol state, rather
+	// than from a duplicated index.
 	transitions := mapper.NewTransitions(log, consensus, execution, read, writer,
 		mapper.WithSkipRegisters(flagSkip),
 	)
+	// TODO(leo): replace FSM with job queue
+	// FSM makes it clear about state transition, however, it also limits the writer
+	// to index only one block at a time, which would be very slow, especially in the case when
+	// the archive node needs to catch up.
+	// if multiple blocks are finalized, technically, they can be indexed concurrently, meaning
+	// concurrently fetching data for multiple blocks and index them. we just need to carefully
+	// set a limit on the number of blocks to be concurrently processed.
+	// There feature has already been implemented in
+	// [jobqueue](https://github.com/onflow/flow-go/blob/master/module/jobqueue/README.md)
+	// would be a good candidate for replacing FSM
+	// also indexing the trie updates and indexing the block data can also be done concurrently, which
+	// FSM doesn't allow
 	state := mapper.EmptyState(flagCheckpoint)
 	fsm := mapper.NewFSM(state,
 		mapper.WithTransition(mapper.StatusInitialize, transitions.InitializeMapper),
