@@ -54,6 +54,7 @@ import (
 	"github.com/onflow/flow-archive/service/metrics"
 	"github.com/onflow/flow-archive/service/profiler"
 	"github.com/onflow/flow-archive/service/storage"
+	"github.com/onflow/flow-archive/service/stream"
 	"github.com/onflow/flow-archive/service/tracker"
 )
 
@@ -89,11 +90,12 @@ func run() int {
 		flagSeedAddress   string
 		flagSeedKey       string
 		flagTracing       bool
+		flagDisableGCP    bool
 	)
 
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving DPS API")
 	pflag.StringVarP(&flagBootstrap, "bootstrap", "b", "bootstrap", "path to directory with bootstrap information for spork")
-	pflag.StringVarP(&flagBucket, "bucket", "u", "", "Google Cloude Storage bucket with block data records")
+	pflag.StringVarP(&flagBucket, "bucket", "u", "", "Google Cloud Storage bucket with block data records")
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to root checkpoint file for execution state trie")
 	pflag.StringVarP(&flagData, "data", "d", "data", "path to database directory for protocol data")
 	pflag.StringVarP(&flagIndex, "index", "i", "index", "path to database directory for state index")
@@ -106,6 +108,7 @@ func run() int {
 	pflag.StringVar(&flagSeedAddress, "seed-address", "", "host address of seed node to follow consensus")
 	pflag.StringVar(&flagSeedKey, "seed-key", "", "hex-encoded public network key of seed node to follow consensus")
 	pflag.BoolVarP(&flagTracing, "tracing", "t", false, "enable tracing for this instance")
+	pflag.BoolVarP(&flagDisableGCP, "disable-cloud-streaming", "g", false, "disable streaming exec data from GCP and use the Access Node instead")
 
 	pflag.Parse()
 
@@ -288,16 +291,23 @@ func run() int {
 			log.Error().Err(err).Msg("could not close GCP client")
 		}
 	}()
-	bucket := client.Bucket(flagBucket)
-	stream := cloud.NewGCPStreamer(log, bucket,
-		cloud.WithCatchupBlocks(blockIDs),
-	)
+	var streamer tracker.DataStreamer
+	if flagDisableGCP || flagBucket == "" {
+		streamer = stream.NewExecDataStreamer(log, flagSeedAddress,
+			stream.WithCatchupBlocks(blockIDs),
+		)
+	} else {
+		bucket := client.Bucket(flagBucket)
+		streamer = cloud.NewGCPStreamer(log, bucket,
+			cloud.WithCatchupBlocks(blockIDs),
+		)
+	}
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
 	// follower and related consensus data on one side, and the cloud streamer
 	// and available execution records on the other side.
-	execution, err := tracker.NewExecution(log, protocolDB, stream)
+	execution, err := tracker.NewExecution(log, protocolDB, streamer)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize execution tracker")
 		return failure
@@ -313,7 +323,7 @@ func run() int {
 	// will use the callback to make additional data available to the mapper,
 	// while the cloud streamer will use the callback to download execution data
 	// for finalized blocks.
-	follow.AddOnBlockFinalizedConsumer(stream.OnBlockFinalized)
+	follow.AddOnBlockFinalizedConsumer(streamer.OnBlockFinalized)
 	follow.AddOnBlockFinalizedConsumer(consensus.OnBlockFinalized)
 
 	// If we have an empty database, we want a loader to bootstrap from the

@@ -15,6 +15,7 @@
 package tracker
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -28,4 +29,10 @@ type RecordStreamer interface {
 // block data for a specific block identifier.
 type RecordHolder interface {
 	Record(blockID flow.Identifier) (*uploader.BlockData, error)
+}
+
+// DataStreamer is a general interface that allows implementations of ExecDataStreamer and GCPStreamer
+type DataStreamer interface {
+	Next() (*uploader.BlockData, error)
+	OnBlockFinalized(block *model.Block)
 }
