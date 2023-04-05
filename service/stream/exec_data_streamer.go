@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
@@ -28,6 +29,7 @@ type ExecDataStreamer struct {
 	limit     uint               // buffer size limit for downloaded records
 	busy      uint32             // used as a guard to avoid concurrent polling
 	ctx       context.Context
+	chain     flow.ChainID
 }
 
 func NewExecDataStreamer(log zerolog.Logger, accessAddr string, options ...Option) *ExecDataStreamer {
@@ -43,12 +45,17 @@ func NewExecDataStreamer(log zerolog.Logger, accessAddr string, options ...Optio
 		grpc.WithTransportCredentials(insecure.NewCredentials())}
 	conn, err := grpc.Dial(accessAddr, opts...)
 	if err != nil {
-		panic(fmt.Sprintf("unable to create connection to node: %s", accessAddr))
+		log.Error()
 	}
 	execDataAPI := execData.NewExecutionDataAPIClient(conn)
 	accessAPI := access.NewAccessAPIClient(conn)
 
 	// get chainID from network params
+	params, err := accessAPI.GetNetworkParameters(ctx, &access.GetNetworkParametersRequest{})
+	if err != nil {
+
+	}
+	chain := flow.ChainID(params.ChainId)
 
 	return &ExecDataStreamer{
 		log:       log,
@@ -59,6 +66,7 @@ func NewExecDataStreamer(log zerolog.Logger, accessAddr string, options ...Optio
 		limit:     cfg.BufferSize,
 		busy:      0,
 		ctx:       ctx,
+		chain:     chain,
 	}
 }
 
@@ -133,19 +141,27 @@ func (e ExecDataStreamer) pullExecData() error {
 }
 
 func (e *ExecDataStreamer) getUploaderBlockData(blockID flow.Identifier) (*uploader.BlockData, error) {
-	// TODO  get block from storage, as it's already populated by consensus follower
+	// TODO : get rid of uploader.BlockData use
+	// we currently have to query additional data from ANs to keep a 1:1 match of the data from the GCP streamer
+	var errs *multierror.Error
+	// get block
+	br := &access.GetBlockByIDRequest{Id: blockID[:]}
+	b, err := e.accessApi.GetBlockByID(e.ctx, br)
+	if err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("failed to get block data for blockID (%s): %w", blockID, err))
+	}
 
-	// get transactions from AN
+	// get transactions
 	txr := &access.GetTransactionsByBlockIDRequest{BlockId: blockID[:]}
 	tx, err := e.accessApi.GetTransactionResultsByBlockID(e.ctx, txr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction results for blockID (%s): %w", blockID, err)
+		errs = multierror.Append(errs, fmt.Errorf("failed to get transaction results for blockID (%s): %w", blockID, err))
 	}
 	// get exec data
 	exr := &execData.GetExecutionDataByBlockIDRequest{BlockId: blockID[:]}
 	ex, err := e.execApi.GetExecutionDataByBlockID(e.ctx, exr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data for blockID (%s): %w", blockID, err)
+		errs = multierror.Append(errs, fmt.Errorf("failed to get execution data for blockID (%s): %w", blockID, err))
 	}
 	// TODO aggregate to *uploader.BlockData
 	return &uploader.BlockData{}, nil
