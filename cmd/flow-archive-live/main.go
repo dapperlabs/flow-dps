@@ -274,29 +274,26 @@ func run() int {
 		return failure
 	}
 
-	// On the other side, we also need access to the execution data. The cloud
-	// streamer is responsible for retrieving block execution records from a
-	// Google Cloud Storage bucket. This component plays the role of what would
-	// otherwise be a network protocol, such as a publish socket.
-	client, err := gcloud.NewClient(context.Background(),
-		option.WithoutAuthentication(),
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("could not connect GCP client")
-		return failure
-	}
-	defer func() {
-		err := client.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("could not close GCP client")
-		}
-	}()
+	// On the other side, we also need access to the execution data from either GCP or Access Node API
 	var streamer tracker.DataStreamer
 	if flagDisableGCP || flagBucket == "" {
 		streamer = stream.NewExecDataStreamer(log, flagSeedAddress,
 			stream.WithCatchupBlocks(blockIDs),
 		)
 	} else {
+		client, err := gcloud.NewClient(context.Background(),
+			option.WithoutAuthentication(),
+		)
+		if err != nil {
+			log.Error().Err(err).Msg("could not connect GCP client")
+			return failure
+		}
+		defer func() {
+			err := client.Close()
+			if err != nil {
+				log.Error().Err(err).Msg("could not close GCP client")
+			}
+		}()
 		bucket := client.Bucket(flagBucket)
 		streamer = cloud.NewGCPStreamer(log, bucket,
 			cloud.WithCatchupBlocks(blockIDs),

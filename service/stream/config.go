@@ -6,7 +6,8 @@ import (
 
 // DefaultConfig is the default configuration for the Streamer.
 var DefaultConfig = Config{
-	BufferSize:    20,
+	// small buffer size as there's almost no latency between API and consensus follower in ANs
+	BufferSize:    4,
 	CatchupBlocks: []flow.Identifier{},
 }
 
