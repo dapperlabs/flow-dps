@@ -27,7 +27,7 @@ require (
 )
 
 require (
-	github.com/onflow/flow-go v0.30.3-fix-read-leaf-nodes
+	github.com/onflow/flow-go v0.30.3-archive-node
 	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/srikrsna/protoc-gen-gotag v0.6.2
 	go.opentelemetry.io/otel v1.11.1
