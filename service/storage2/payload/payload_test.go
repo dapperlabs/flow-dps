@@ -1,7 +1,11 @@
 package payload
 
 import (
+	"bytes"
+	"fmt"
+	"math/rand"
 	"path"
+	"strconv"
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -13,7 +17,7 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	dbpath := path.Join(t.TempDir(), "roundtrip.db")
-	s, err := NewPayloadStorage(dbpath, 1*1024*1024)
+	s, err := NewPayloadStorage(dbpath, 1<<20)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -51,7 +55,7 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	t.Parallel()
 
 	dbpath := path.Join(t.TempDir(), "versionning.db")
-	s, err := NewPayloadStorage(dbpath, 1*1024*1024)
+	s, err := NewPayloadStorage(dbpath, 1<<20)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -110,3 +114,86 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	err = s.Close()
 	require.NoError(t, err)
 }
+
+// Benchmark_PayloadStorage benchmarks the SetBatch method.
+func Benchmark_PayloadStorage(b *testing.B) {
+	dbpath := path.Join(b.TempDir(), "set_batch.db")
+	s, err := NewPayloadStorage(dbpath, 32<<20)
+	require.NoError(b, err)
+	require.NotNil(b, s)
+
+	batchSizeKey := flow.NewRegisterID("batch", "size")
+	const maxBatchSize = 1024
+	var totalBatchSize int
+
+	keyForBatchSize := func(i int) flow.RegisterID {
+		return flow.NewRegisterID("batch", strconv.Itoa(i))
+	}
+	valueForHeightAndKey := func(i, j int) []byte {
+		return []byte(fmt.Sprintf("%d-%d", i, j))
+	}
+	b.ResetTimer()
+
+	// Write a random number of entries in each batch.
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		batchSize := rand.Intn(maxBatchSize) + 1
+		totalBatchSize += batchSize
+		entries := make(flow.RegisterEntries, 1, batchSize)
+		entries[0] = flow.RegisterEntry{
+			Key:   batchSizeKey,
+			Value: []byte(fmt.Sprintf("%d", batchSize)),
+		}
+		for j := 1; j < batchSize; j++ {
+			entries = append(entries, flow.RegisterEntry{
+				Key:   keyForBatchSize(j),
+				Value: valueForHeightAndKey(i, j),
+			})
+		}
+		b.StartTimer()
+
+		err = s.SetBatch(uint64(i), entries)
+		require.NoError(b, err)
+	}
+
+	b.StopTimer()
+
+	// verify written batches
+	for i := 0; i < b.N; i++ {
+		// get number of batches written for height
+		batchSizeBytes, err := s.Get(uint64(i), batchSizeKey)
+		require.NoError(b, err)
+		batchSize, err := strconv.Atoi(string(batchSizeBytes))
+		require.NoError(b, err)
+
+		// verify that all entries can be read with correct values
+		for j := 1; j < batchSize; j++ {
+			value, err := s.Get(uint64(i), keyForBatchSize(j))
+			require.NoError(b, err)
+			require.Equal(b, valueForHeightAndKey(i, j), value)
+		}
+
+		// verify that the rest of the batches either do not exist or have a previous height
+		for j := batchSize; j < maxBatchSize+1; j++ {
+			value, err := s.Get(uint64(i), keyForBatchSize(j))
+			if err == nil {
+				ij := bytes.Split(value, []byte("-"))
+
+				// verify that we've got a value for a previous height
+				height, err := strconv.Atoi(string(ij[0]))
+				require.NoError(b, err)
+				require.Lessf(b, height, i, "height: %d, j: %d", height, j)
+
+				// verify that we've got a value corresponding to the index
+				index, err := strconv.Atoi(string(ij[1]))
+				require.NoError(b, err)
+				require.Equal(b, index, j)
+			} else {
+				require.Error(b, err)
+				require.Nil(b, value)
+			}
+		}
+	}
+}
+
+// TODO(rbtz): add parallel benchmarks
