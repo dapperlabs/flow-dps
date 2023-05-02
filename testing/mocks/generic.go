@@ -201,19 +201,32 @@ func GenericLedgerPath(index int) ledger.Path {
 	return GenericLedgerPaths(index + 1)[index]
 }
 
-func GenericLedgerValues(number int) []ledger.Value {
+func GenericLedgerRegisters(number int) flow.RegisterIDs {
 	// Ensure consistent deterministic results.
 	random := rand.New(rand.NewSource(3))
 
-	var values []ledger.Value
+	registers := make(flow.RegisterIDs, 0, number)
 	for i := 0; i < number; i++ {
-		value := make(ledger.Value, 32)
-		binary.BigEndian.PutUint64(value[0:], random.Uint64())
-		binary.BigEndian.PutUint64(value[8:], random.Uint64())
-		binary.BigEndian.PutUint64(value[16:], random.Uint64())
-		binary.BigEndian.PutUint64(value[24:], random.Uint64())
+		registers = append(registers, flow.RegisterID{
+			Owner: GenericAddress(i).String(),
+			Key:   fmt.Sprintf("value-%d", random.Uint64()),
+		})
+	}
 
-		values = append(values, value)
+	return registers
+}
+
+func GenericLedgerRegister(index int) flow.RegisterID {
+	return GenericLedgerRegisters(index + 1)[index]
+}
+
+func GenericLedgerValues(number int) []flow.RegisterValue {
+	// Ensure consistent deterministic results.
+	random := rand.New(rand.NewSource(3))
+
+	values := make([]flow.RegisterValue, 0, number)
+	for i := 0; i < number; i++ {
+		values = append(values, []byte(fmt.Sprintf("value-%d", random.Uint64())))
 	}
 
 	return values

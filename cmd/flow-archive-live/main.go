@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -53,6 +54,7 @@ import (
 	"github.com/onflow/flow-archive/service/metrics"
 	"github.com/onflow/flow-archive/service/profiler"
 	"github.com/onflow/flow-archive/service/storage"
+	"github.com/onflow/flow-archive/service/storage2/payload"
 	"github.com/onflow/flow-archive/service/tracker"
 )
 
@@ -153,6 +155,20 @@ func run() int {
 		}
 	}()
 
+	// XXX
+	payloadDBPath := path.Join(flagIndex, "payloads")
+	payloadDB, err := payload.NewPayloadStorage(payloadDBPath, 1<<30)
+	if err != nil {
+		log.Error().Str("payload", payloadDBPath).Err(err).Msg("could not open payload db")
+		return failure
+	}
+	defer func() {
+		err := payloadDB.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("could not close payload database")
+		}
+	}()
+
 	// Next, we initialize the index reader and writer. They use a common codec
 	// and storage library to interact with the underlying database. If there
 	// already is an index database, we need the force flag to be set, as we do
@@ -161,7 +177,7 @@ func run() int {
 	// shutting down.
 	codec := zbor.NewCodec()
 	storage := storage.New(codec)
-	read := index.NewReader(log, indexDB, storage)
+	read := index.NewReader(log, indexDB, storage, payloadDB)
 
 	// We initialize the writer with a flush interval, which will make sure that
 	// Badger transactions are committed to the database, even if they don't
@@ -171,6 +187,7 @@ func run() int {
 	write := index.NewWriter(
 		indexDB,
 		storage,
+		payloadDB,
 		index.WithFlushInterval(flagFlushInterval),
 	)
 

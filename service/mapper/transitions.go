@@ -486,20 +486,21 @@ func (t *Transitions) MapRegisters(s *State) error {
 	// FSM the chance to exit the loop between every 1000 payloads we index. It
 	// doesn't really matter for badger if they are in random order, so this
 	// way of iterating should be fine.
+	//
+	// TODO(rbtz): we should write payloads in atomic batches, otherwise
+	// it is possible for script execution to see a partial state.
 	n := 1000
-	paths := make([]ledger.Path, 0, n)
 	payloads := make([]*ledger.Payload, 0, n)
 	for path, payload := range s.registers {
-		paths = append(paths, path)
 		payloads = append(payloads, payload)
 		delete(s.registers, path)
-		if len(paths) >= n {
+		if len(payloads) >= n {
 			break
 		}
 	}
 
 	// Then we store the (maximum) 1000 paths and payloads.
-	err := t.write.Payloads(s.height, paths, payloads)
+	err := t.write.Payloads(s.height, payloads)
 	if err != nil {
 		return fmt.Errorf("could not index registers: %w", err)
 	}
@@ -510,7 +511,7 @@ func (t *Transitions) MapRegisters(s *State) error {
 		return nil
 	}
 
-	log.Debug().Int("batch", len(paths)).Int("remaining", len(s.registers)).Msg("indexed register batch for finalized block")
+	log.Debug().Int("batch", len(payloads)).Int("remaining", len(s.registers)).Msg("indexed register batch for finalized block")
 
 	return nil
 }

@@ -18,17 +18,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-archive/models/archive"
+	"github.com/onflow/flow-archive/service/storage2/payload"
 )
 
 // ConcurrentPathReadLimit sets the number of concurrent paths in the Values lookup
@@ -40,17 +39,26 @@ type Reader struct {
 	log zerolog.Logger
 	db  *badger.DB
 	lib archive.ReadLibrary
+
+	registerReader archive.RegisterReader
 }
 
 // NewReader creates a new index reader, using the given database as the
 // underlying state repository. It is recommended to provide a read-only Badger
 // database.
-func NewReader(log zerolog.Logger, db *badger.DB, lib archive.ReadLibrary) *Reader {
+func NewReader(
+	log zerolog.Logger,
+	db *badger.DB,
+	lib archive.ReadLibrary,
+	rr archive.RegisterReader,
+) *Reader {
 
 	r := Reader{
 		log: log.With().Str("component", "index_reader").Logger(),
 		db:  db,
 		lib: lib,
+
+		registerReader: rr,
 	}
 
 	return &r
@@ -96,9 +104,7 @@ func (r *Reader) Header(height uint64) (*flow.Header, error) {
 // as they were after the execution of the finalized block at the given height.
 // For compatibility with existing Flow execution node code, a path that is not
 // found within the indexed execution state returns a nil value without error.
-func (r *Reader) Values(height uint64, paths []ledger.Path) ([]ledger.Value, error) {
-	t := time.Now()
-
+func (r *Reader) Values(height uint64, regs flow.RegisterIDs) ([]flow.RegisterValue, error) {
 	first, err := r.First()
 	if err != nil {
 		return nil, fmt.Errorf("could not check first height: %w", err)
@@ -107,36 +113,31 @@ func (r *Reader) Values(height uint64, paths []ledger.Path) ([]ledger.Value, err
 	if err != nil {
 		return nil, fmt.Errorf("could not check last height: %w", err)
 	}
+
 	if height < first || height > last {
 		return nil, fmt.Errorf("invalid height (given: %d, first: %d, last: %d)", height, first, last)
 	}
-	values := make([]ledger.Value, len(paths))
+
+	values := make([]flow.RegisterValue, len(regs))
 	g, _ := errgroup.WithContext(context.Background())
 	g.SetLimit(ConcurrentPathReadLimit)
-	for i, path := range paths {
-		i, path := i, path
+	for i, reg := range regs {
+		i, reg := i, reg
 		g.Go(func() error {
-			err = r.db.View(func(tx *badger.Txn) error {
-				var payload ledger.Payload
-				err := r.lib.RetrievePayload(height, path, &payload)(tx)
-				if errors.Is(err, badger.ErrKeyNotFound) {
-					values[i] = nil
-					return nil
-				}
-				if err != nil {
-					return fmt.Errorf("could not retrieve payload (path: %x): %w", path, err)
-				}
-
-				values[i] = payload.Value()
+			value, err := r.registerReader.Get(height, reg)
+			if errors.Is(err, &payload.ErrNotFound{}) {
+				values[i] = nil
 				return nil
-			})
+			}
+			if err != nil {
+				return fmt.Errorf("could not retrieve payload (register: %s): %w", reg, err)
+			}
+
+			values[i] = value
 			return err
 		})
 	}
 	err = g.Wait()
-
-	// Temporary log line to compare execution times of individual GetRegisterValues calls
-	r.log.Info().Dur("duration", time.Since(t)).Int("paths", len(paths)).Uint64("height", height).Msg("index reader values fetched from db")
 
 	return values, err
 }

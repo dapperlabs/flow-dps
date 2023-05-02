@@ -20,9 +20,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"time"
 
 	"github.com/onflow/flow-archive/service/metrics"
+	"github.com/onflow/flow-archive/service/storage2/payload"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -88,6 +90,20 @@ func run() int {
 	}
 	defer db.Close()
 
+	// XXX
+	payloadDBPath := path.Join(flagIndex, "payloads")
+	payloadDB, err := payload.NewPayloadStorage(payloadDBPath, 1<<30)
+	if err != nil {
+		log.Error().Str("payload", payloadDBPath).Err(err).Msg("could not open payload db")
+		return failure
+	}
+	defer func() {
+		err := payloadDB.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("could not close payload database")
+		}
+	}()
+
 	// Initialize storage library.
 	codec := zbor.NewCodec()
 	storage := storage.New(codec)
@@ -106,7 +122,7 @@ func run() int {
 			logging.StreamServerInterceptor(grpczerolog.InterceptorLogger(log), opts...),
 		),
 	)
-	index := index.NewReader(log, db, storage)
+	index := index.NewReader(log, db, storage, payloadDB)
 	var server *api.Server
 	if flagTracing {
 		tracer, err := metrics.NewTracer(log, "archive")

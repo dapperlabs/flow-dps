@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"io"
 	"os"
+	"path"
 	"runtime"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-archive/service/index"
 	"github.com/onflow/flow-archive/service/storage"
+	"github.com/onflow/flow-archive/service/storage2/payload"
 )
 
 const (
@@ -82,8 +84,22 @@ func run() int {
 	}
 	defer db.Close()
 
+	// XXX
+	payloadDBPath := path.Join(flagIndex, "payloads")
+	payloadDB, err := payload.NewPayloadStorage(payloadDBPath, 1<<30)
+	if err != nil {
+		log.Error().Str("payload", payloadDBPath).Err(err).Msg("could not open payload db")
+		return failure
+	}
+	defer func() {
+		err := payloadDB.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("could not close payload database")
+		}
+	}()
+
 	// Check if the database is empty.
-	index := index.NewReader(log, db, storage.New(zbor.NewCodec()))
+	index := index.NewReader(log, db, storage.New(zbor.NewCodec()), payloadDB)
 	_, err = index.First()
 	if err == nil {
 		log.Error().Msg("database directory already contains index database")

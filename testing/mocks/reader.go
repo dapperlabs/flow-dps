@@ -17,7 +17,6 @@ package mocks
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -28,7 +27,7 @@ type Reader struct {
 	CommitFunc               func(height uint64) (flow.StateCommitment, error)
 	HeaderFunc               func(height uint64) (*flow.Header, error)
 	EventsFunc               func(height uint64, types ...flow.EventType) ([]flow.Event, error)
-	ValuesFunc               func(height uint64, paths []ledger.Path) ([]ledger.Value, error)
+	ValuesFunc               func(height uint64, regs flow.RegisterIDs) ([]flow.RegisterValue, error)
 	CollectionFunc           func(collID flow.Identifier) (*flow.LightCollection, error)
 	CollectionsByHeightFunc  func(height uint64) ([]flow.Identifier, error)
 	GuaranteeFunc            func(collID flow.Identifier) (*flow.CollectionGuarantee, error)
@@ -62,7 +61,7 @@ func BaselineReader(t *testing.T) *Reader {
 		EventsFunc: func(height uint64, types ...flow.EventType) ([]flow.Event, error) {
 			return GenericEvents(4, GenericEventTypes(2)...), nil
 		},
-		ValuesFunc: func(height uint64, paths []ledger.Path) ([]ledger.Value, error) {
+		ValuesFunc: func(height uint64, regs flow.RegisterIDs) ([]flow.RegisterValue, error) {
 			return GenericLedgerValues(6), nil
 		},
 		CollectionFunc: func(collID flow.Identifier) (*flow.LightCollection, error) {
@@ -121,8 +120,8 @@ func (r *Reader) Events(height uint64, types ...flow.EventType) ([]flow.Event, e
 	return r.EventsFunc(height, types...)
 }
 
-func (r *Reader) Values(height uint64, paths []ledger.Path) ([]ledger.Value, error) {
-	return r.ValuesFunc(height, paths)
+func (r *Reader) Values(height uint64, regs flow.RegisterIDs) ([]flow.RegisterValue, error) {
+	return r.ValuesFunc(height, regs)
 }
 
 func (r *Reader) Collection(collID flow.Identifier) (*flow.LightCollection, error) {

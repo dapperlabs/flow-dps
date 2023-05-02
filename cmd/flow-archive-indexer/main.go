@@ -18,6 +18,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"path"
 	"runtime"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/onflow/flow-archive/service/index"
 	"github.com/onflow/flow-archive/service/mapper"
 	"github.com/onflow/flow-archive/service/storage"
+	"github.com/onflow/flow-archive/service/storage2/payload"
 	"github.com/onflow/flow-archive/service/triereader"
 )
 
@@ -107,6 +109,20 @@ func run() int {
 		}
 	}()
 
+	// XXX
+	payloadDBPath := path.Join(flagIndex, "payloads")
+	payloadDB, err := payload.NewPayloadStorage(payloadDBPath, 1<<30)
+	if err != nil {
+		log.Error().Str("payload", payloadDBPath).Err(err).Msg("could not open payload db")
+		return failure
+	}
+	defer func() {
+		err := payloadDB.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("could not close payload database")
+		}
+	}()
+
 	// The storage library is initialized with a codec and provides functions to
 	// interact with a Badger database while encoding and compressing
 	// transparently.
@@ -114,7 +130,7 @@ func run() int {
 	storage := storage.New(codec)
 
 	// Check if index already exists.
-	read := index.NewReader(log, indexDB, storage)
+	read := index.NewReader(log, indexDB, storage, payloadDB)
 	empty := errors.Is(err, badger.ErrKeyNotFound)
 	if err != nil && !empty {
 		log.Error().Err(err).Msg("could not get first height from index reader")
@@ -139,7 +155,10 @@ func run() int {
 	// Writer is responsible for writing the index data to the index database.
 	// We explicitly disable flushing at regular intervals to improve throughput
 	// of badger transactions when indexing from static on-disk data.
-	write := index.NewWriter(indexDB, storage,
+	write := index.NewWriter(
+		indexDB,
+		storage,
+		payloadDB,
 		index.WithFlushInterval(0),
 	)
 	defer func() {
