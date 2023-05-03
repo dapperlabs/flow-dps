@@ -135,6 +135,11 @@ func (e *Execution) Record(blockID flow.Identifier) (*uploader.BlockData, error)
 	// If we have the block available in the cache, let's feed it to the
 	// consumer.
 	record, ok := e.records[blockID]
+	e.log.Debug().
+		Hex("block", blockID[:]).
+		Bool("found", ok).
+		Msg("looking for block data")
+
 	if ok {
 		e.purge(record.Block.Header.Height)
 		return record, nil
@@ -165,6 +170,12 @@ func (e *Execution) processNext() error {
 	// Check if we already processed a block with this ID recently. This should
 	// be idempotent, but we should be aware if something like this happens.
 	blockID := record.Block.Header.ID()
+
+	e.log.Debug().
+		Hex("block", blockID[:]).
+		Uint64("height", record.Block.Header.Height).
+		Msg("block data downloaded")
+
 	_, ok := e.records[blockID]
 	if ok {
 		return fmt.Errorf("duplicate execution record (block: %x)", blockID)
@@ -178,6 +189,7 @@ func (e *Execution) processNext() error {
 
 	e.log.Debug().
 		Hex("block", blockID[:]).
+		Uint64("height", record.Block.Header.Height).
 		Int("updates", len(record.TrieUpdates)).
 		Msg("next execution record processed")
 
