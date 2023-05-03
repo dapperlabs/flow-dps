@@ -18,9 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"io"
 	"sync/atomic"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 
 	"cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
@@ -180,9 +181,23 @@ func (g *GCPStreamer) download() error {
 			return fmt.Errorf("could not pull execution record (name: %s): %w", name, err)
 		}
 
+		downloadedID := record.Block.Header.ID()
+
+		if downloadedID != blockID {
+			g.log.Warn().
+				Str("name", name).
+				Uint64("height", record.Block.Header.Height).
+				Hex("download_block_id", downloadedID[:]).
+				Hex("block", blockID[:]).
+				Msg("downloaded a block from GCP with mismatching block ID")
+			g.queue.PushBack(blockID)
+			continue
+		}
+
 		g.log.Debug().
 			Str("name", name).
 			Uint64("height", record.Block.Header.Height).
+			Hex("download_block_id", blockID[:]).
 			Hex("block", blockID[:]).
 			Msg("pushing execution record into buffer")
 
