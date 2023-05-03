@@ -184,6 +184,7 @@ func (c *Consensus) Seals(height uint64) ([]*flow.Seal, error) {
 
 // Commit returns the state commitment for the given height, if available.
 func (c *Consensus) Commit(height uint64) (flow.StateCommitment, error) {
+	log.Debug().Msgf("consensus commit for block %v", height)
 
 	if height > c.last {
 		log.Debug().Msgf("not available for commit when height (%v) > last (%v)",
@@ -198,6 +199,7 @@ func (c *Consensus) Commit(height uint64) (flow.StateCommitment, error) {
 		return flow.DummyStateCommitment, fmt.Errorf("could not look up block: %w", err)
 	}
 
+	log.Debug().Msgf("consensus commit for block %v (id: %v)", height, blockID)
 	record, err := c.hold.Record(blockID)
 	if err != nil {
 		return flow.DummyStateCommitment, fmt.Errorf("could not get record: %w", err)
