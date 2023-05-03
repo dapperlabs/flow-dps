@@ -16,10 +16,12 @@ package tracker
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -184,6 +186,9 @@ func (c *Consensus) Seals(height uint64) ([]*flow.Seal, error) {
 func (c *Consensus) Commit(height uint64) (flow.StateCommitment, error) {
 
 	if height > c.last {
+		log.Debug().Msgf("not available for commit when height (%v) > last (%v)",
+			height, c.last)
+
 		return flow.DummyStateCommitment, archive.ErrUnavailable
 	}
 

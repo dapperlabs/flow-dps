@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -68,6 +69,8 @@ func CatchupBlocks(db *badger.DB, read archive.Reader) ([]flow.Identifier, error
 	if err != nil {
 		return nil, fmt.Errorf("could not get last finalized: %w", err)
 	}
+
+	log.Info().Msgf("catch up blocks, finalized: %v, last indexed: %v", finalized, indexed)
 
 	// We can now step from the first height after the indexed height to the
 	// finalized height and collect all the block IDs on the way. These can then
