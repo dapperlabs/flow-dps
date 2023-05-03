@@ -186,9 +186,9 @@ func (e *Execution) processNext() error {
 
 // purge deletes all records that are below the specified height threshold.
 func (e *Execution) purge(threshold uint64) {
-	for blockID, record := range e.records {
-		if record.Block.Header.Height < threshold {
-			delete(e.records, blockID)
-		}
-	}
+	// for blockID, record := range e.records {
+	// 	if record.Block.Header.Height < threshold {
+	// 		delete(e.records, blockID)
+	// 	}
+	// }
 }
