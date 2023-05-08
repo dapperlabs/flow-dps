@@ -121,7 +121,7 @@ func (r *Reader) Values(height uint64, regs flow.RegisterIDs) ([]flow.RegisterVa
 	err = g.Wait()
 
 	// Temporary log line to compare execution times of individual GetRegisterValues calls
-	r.log.Info().
+	r.log.Debug().
 		Dur("duration", time.Since(t)).
 		Int("paths", len(regs)).
 		Uint64("height", height).
