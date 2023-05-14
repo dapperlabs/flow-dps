@@ -1,17 +1,3 @@
-// Copyright 2021 Optakt Labs OÜ
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License. You may obtain a copy of
-// the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-// License for the specific language governing permissions and limitations under
-// the License.
-
 package main
 
 import (
@@ -42,19 +28,22 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	unstaked "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	api "github.com/onflow/flow-archive/api/archive"
 	"github.com/onflow/flow-archive/codec/zbor"
 	"github.com/onflow/flow-archive/models/archive"
+	accessSvc "github.com/onflow/flow-archive/service/access"
 	"github.com/onflow/flow-archive/service/cloud"
 	"github.com/onflow/flow-archive/service/index"
 	"github.com/onflow/flow-archive/service/initializer"
-	"github.com/onflow/flow-archive/service/loader"
+	"github.com/onflow/flow-archive/service/invoker"
 	"github.com/onflow/flow-archive/service/mapper"
 	"github.com/onflow/flow-archive/service/metrics"
 	"github.com/onflow/flow-archive/service/profiler"
 	"github.com/onflow/flow-archive/service/storage"
 	"github.com/onflow/flow-archive/service/stream"
+	"github.com/onflow/flow-archive/service/storage2"
 	"github.com/onflow/flow-archive/service/tracker"
 )
 
@@ -75,16 +64,23 @@ func run() int {
 
 	// Command line parameter initialization.
 	var (
-		flagAddress     string
-		flagBootstrap   string
-		flagBucket      string
-		flagCheckpoint  string
-		flagData        string
-		flagIndex       string
-		flagLevel       string
-		flagMetricsAddr string
-		flagProfiling   string
-		flagSkip        bool
+		flagAccessAddress    string
+		flagAddress          string
+		flagBootstrap        string
+		flagBucket           string
+		flagCheckpoint       string
+		flagData             string
+		flagIndex            string
+		flagLevel            string
+		flagFollowerLogLevel string
+		flagMetricsAddr      string
+		flagProfiling        string
+		flagSkip             bool
+		flagWaitInterval     time.Duration
+
+		flagCache          uint64
+		flagIndex2         string
+		flagBlockCacheSize int64
 
 		flagFlushInterval time.Duration
 		flagSeedAddress   string
@@ -92,17 +88,23 @@ func run() int {
 		flagTracing       bool
 		flagDisableGCP    bool
 	)
-
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving DPS API")
+	pflag.StringVarP(&flagAccessAddress, "address-access", "A", "127.0.0.1:9000", "address to serve Access API on")
 	pflag.StringVarP(&flagBootstrap, "bootstrap", "b", "bootstrap", "path to directory with bootstrap information for spork")
 	pflag.StringVarP(&flagBucket, "bucket", "u", "", "Google Cloud Storage bucket with block data records")
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to root checkpoint file for execution state trie")
 	pflag.StringVarP(&flagData, "data", "d", "data", "path to database directory for protocol data")
-	pflag.StringVarP(&flagIndex, "index", "i", "index", "path to database directory for state index")
 	pflag.StringVarP(&flagLevel, "level", "l", "info", "log output level")
+	pflag.StringVarP(&flagFollowerLogLevel, "follower-level", "", "info", "log output level for follower engine")
 	pflag.StringVarP(&flagMetricsAddr, "metrics", "m", "", "address on which to expose metrics (no metrics are exposed when left empty)")
 	pflag.StringVarP(&flagProfiling, "profiler-address", "p", "", "address for net/http/pprof profiler (profiler is disabled if left empty)")
-	pflag.BoolVarP(&flagSkip, "skip", "s", false, "skip indexing of execution state ledger registers")
+	pflag.BoolVarP(&flagSkip, "skip", "s", mapper.DefaultConfig.SkipRegisters, "skip indexing of execution state ledger registers")
+	pflag.DurationVarP(&flagWaitInterval, "wait-interval", "", mapper.DefaultConfig.WaitInterval, "wait interval for polling execution data for the next block (default: 250ms), useful to set a longer duration after fully synced for historical spork")
+
+	pflag.StringVarP(&flagIndex, "index", "i", "index", "path to database directory for state index")
+	pflag.StringVarP(&flagIndex2, "index2", "I", "index2", "path to the pebble-based index database directory")
+	pflag.Int64Var(&flagBlockCacheSize, "block-cache-size", 1<<30, "size of the pebble block cache in bytes.")
+	pflag.Uint64Var(&flagCache, "register-cache-size", 1<<30, "maximum cache size for register reads in bytes")
 
 	pflag.DurationVar(&flagFlushInterval, "flush-interval", 1*time.Second, "interval for flushing badger transactions (0s for disabled)")
 	pflag.StringVar(&flagSeedAddress, "seed-address", "", "host address of seed node to follow consensus")
@@ -161,17 +163,18 @@ func run() int {
 	// shutting down.
 	codec := zbor.NewCodec()
 	storage := storage.New(codec)
-	read := index.NewReader(log, indexDB, storage)
-	first, err := read.First()
-	if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
-		log.Error().Err(err).Msg("could not get first height from index reader")
+	storage2, err := storage2.NewLibrary2(flagIndex2, flagBlockCacheSize)
+	if err != nil {
+		log.Error().Str("index2", flagIndex2).Err(err).Msg("could not open storage2")
 		return failure
 	}
-	empty := errors.Is(err, badger.ErrKeyNotFound)
-	if empty && flagCheckpoint == "" {
-		log.Error().Msg("index database is empty, please provide root checkpoint (-c, --checkpoint) to bootstrap")
-		return failure
-	}
+	defer func() {
+		err := storage2.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("could not close storage2")
+		}
+	}()
+	read := index.NewReader(log, indexDB, storage, storage2)
 
 	// We initialize the writer with a flush interval, which will make sure that
 	// Badger transactions are committed to the database, even if they don't
@@ -181,6 +184,7 @@ func run() int {
 	write := index.NewWriter(
 		indexDB,
 		storage,
+		storage2,
 		index.WithFlushInterval(flagFlushInterval),
 	)
 
@@ -195,9 +199,9 @@ func run() int {
 	// is a network key, used to secure the peer-to-peer communication. However,
 	// as we do not need any specific key, we choose to just initialize a new
 	// key on each start of the live indexer.
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	seed := make([]byte, crypto.PrKeyLenECDSASecp256k1)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenECDSASecp256k1 {
+	if err != nil || n != crypto.PrKeyLenECDSASecp256k1 {
 		log.Error().Err(err).Msg("could not generate private key seed")
 		return failure
 	}
@@ -227,23 +231,27 @@ func run() int {
 		log.Error().Err(err).Str("key", flagSeedKey).Msg("could not parse seed node network public key")
 		return failure
 	}
+	log.Info().Msgf("syncing block data from  seed node: %v:%v with key: %v", seedHost, seedPort, seedKey)
 	seedNodes := []unstaked.BootstrapNodeInfo{{
 		Host:             seedHost,
 		Port:             uint(seedPort),
 		NetworkPublicKey: seedKey,
 	}}
+	log.Info().Msgf("creating consensus follower with %v seedNodes, bootstrap: %v, followerLogLevel: %v",
+		len(seedNodes), flagBootstrap, flagFollowerLogLevel)
 	follow, err := unstaked.NewConsensusFollower(
 		privKey,
 		"0.0.0.0:0", // automatically choose port, listen on all IPs
 		seedNodes,
 		unstaked.WithBootstrapDir(flagBootstrap),
 		unstaked.WithDB(protocolDB),
-		unstaked.WithLogLevel(flagLevel),
+		unstaked.WithLogLevel(flagFollowerLogLevel),
 	)
 	if err != nil {
 		log.Error().Err(err).Str("bucket", flagBucket).Msg("could not create consensus follower")
 		return failure
 	}
+	log.Info().Msg("consensus follower created succesfully")
 
 	// There is a problem with the Flow consensus follower API which makes it
 	// impossible to use it to bootstrap the protocol state. The consensus
@@ -259,12 +267,15 @@ func run() int {
 		return failure
 	}
 	defer file.Close()
+
+	log.Info().Msgf("initializing protocol state database from path: %v", path)
 	err = initializer.ProtocolState(file, protocolDB)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize protocol state")
 		return failure
 	}
 
+	log.Info().Msgf("initialized protocol state database from path: %v. start catching block blocks", path)
 	// If we are resuming, and the consensus follower has already finalized some
 	// blocks that were not yet indexed, we need to download them again in the
 	// cloud streamer. Here, we figure out which blocks these are.
@@ -299,6 +310,28 @@ func run() int {
 			cloud.WithCatchupBlocks(blockIDs),
 		)
 	}
+	log.Info().Msgf("%v blocks to catchup", len(blockIDs))
+	// On the other side, we also need access to the execution data. The cloud
+	// streamer is responsible for retrieving block execution records from a
+	// Google Cloud Storage bucket. This component plays the role of what would
+	// otherwise be a network protocol, such as a publish socket.
+	client, err := gcloud.NewClient(context.Background(),
+		option.WithoutAuthentication(),
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("could not connect GCP client")
+		return failure
+	}
+	defer func() {
+		err := client.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("could not close GCP client")
+		}
+	}()
+	bucket := client.Bucket(flagBucket)
+	stream := cloud.NewGCPStreamer(log, bucket,
+		cloud.WithCatchupBlocks(blockIDs),
+	)
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
@@ -323,21 +356,6 @@ func run() int {
 	follow.AddOnBlockFinalizedConsumer(streamer.OnBlockFinalized)
 	follow.AddOnBlockFinalizedConsumer(consensus.OnBlockFinalized)
 
-	// If we have an empty database, we want a loader to bootstrap from the
-	// checkpoint; if we don't, we can optionally use the root checkpoint to
-	// speed up the restart/restoration.
-	var load mapper.Loader
-	load = loader.FromIndex(log, storage, indexDB)
-	if empty {
-		load = loader.FromCheckpointFile(flagCheckpoint, &log)
-	} else if flagCheckpoint != "" {
-		initialize := loader.FromCheckpointFile(flagCheckpoint, &log)
-		load = loader.FromIndex(log, storage, indexDB,
-			loader.WithInitializer(initialize),
-			loader.WithExclude(loader.ExcludeAtOrBelow(first)),
-		)
-	}
-
 	// If metrics are enabled, the mapper should use the metrics writer. Otherwise, it can
 	// use the regular one.
 	writer := archive.Writer(write)
@@ -346,12 +364,13 @@ func run() int {
 		writer = metrics.NewMetricsWriter(write)
 	}
 
+	log.Info().Msgf("creating FSM with flags: (flagSkip: %v, flagWaitInterval: %v)", flagSkip, flagWaitInterval)
 	// At this point, we can initialize the core business logic of the indexer,
 	// with the mapper's finite state machine and transitions. We also want to
 	// load and inject the root checkpoint if it is given as a parameter.
-	transitions := mapper.NewTransitions(log, load, consensus, execution, read, writer,
-		mapper.WithBootstrapState(empty),
+	transitions := mapper.NewTransitions(log, consensus, execution, read, writer,
 		mapper.WithSkipRegisters(flagSkip),
+		mapper.WithWaitInterval(flagWaitInterval),
 	)
 	state := mapper.EmptyState(flagCheckpoint)
 	fsm := mapper.NewFSM(state,
@@ -371,7 +390,7 @@ func run() int {
 		logging.WithLevels(logging.DefaultServerCodeToLevel),
 	}
 	interceptor := grpczerolog.InterceptorLogger(log.With().Str("component", "grpc_server").Logger())
-	gsvr := grpc.NewServer(
+	options := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			tags.UnaryServerInterceptor(),
 			logging.UnaryServerInterceptor(interceptor, logOpts...),
@@ -380,7 +399,9 @@ func run() int {
 			tags.StreamServerInterceptor(),
 			logging.StreamServerInterceptor(interceptor, logOpts...),
 		),
-	)
+	}
+
+	gsvr := grpc.NewServer(options...)
 	var server *api.Server
 	if flagTracing {
 		tracer, err := metrics.NewTracer(log, "archive")
@@ -393,14 +414,34 @@ func run() int {
 		server = api.NewServer(read, codec)
 	}
 
+	log.Info().Msgf("Creating local invoker with register cache: %d", flagCache)
+	invoke, err := invoker.New(read, invoker.WithCacheSize(flagCache))
+	if err != nil {
+		log.Error().Err(err).Msg("could not initialize script invoker")
+		return failure
+	}
+	accessServer := accessSvc.NewServer(read, invoke)
+	accessGsvr := grpc.NewServer(options...)
+
 	// This section launches the main executing components in their own
 	// goroutine, so they can run concurrently. Afterwards, we wait for an
 	// interrupt signal in order to proceed with the shutdown.
+	log.Info().Msgf("creating server at address: %v", flagAddress)
 	listener, err := net.Listen("tcp", flagAddress)
 	if err != nil {
 		log.Error().Str("address", flagAddress).Err(err).Msg("could not create listener")
 		return failure
 	}
+	log.Info().Msgf("server created at address: %v", flagAddress)
+
+	log.Info().Msgf("creating server at address: %v", flagAccessAddress)
+	accessListener, err := net.Listen("tcp", flagAccessAddress)
+	if err != nil {
+		log.Error().Str("address", flagAccessAddress).Err(err).Msg("could not create listener")
+		return failure
+	}
+	log.Info().Msgf("server created at address: %v", flagAccessAddress)
+
 	done := make(chan struct{})
 	failed := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -429,6 +470,15 @@ func run() int {
 			log.Warn().Err(err).Msg("Flow DPS Server failed")
 		}
 		log.Info().Msg("Flow DPS Live Server stopped")
+	}()
+	go func() {
+		log.Info().Msg("Flow Access API Server starting")
+		access.RegisterAccessAPIServer(accessGsvr, accessServer)
+		err = accessGsvr.Serve(accessListener)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Warn().Err(err).Msg("Flow Access API Server failed")
+		}
+		log.Info().Msg("Flow Access API Server stopped")
 	}()
 	go func() {
 		if !metricsEnabled {
@@ -463,11 +513,11 @@ func run() int {
 	// another signal.
 	select {
 	case <-sig:
-		log.Info().Msg("Flow DPS Indexer stopping")
+		log.Info().Msg("Flow DPS Live stopping")
 	case <-done:
-		log.Info().Msg("Flow DPS Indexer done")
+		log.Info().Msg("Flow DPS Live done")
 	case <-failed:
-		log.Warn().Msg("Flow DPS Indexer aborted")
+		log.Warn().Msg("Flow DPS Live aborted")
 	}
 	go func() {
 		<-sig

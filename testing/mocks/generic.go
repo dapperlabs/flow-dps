@@ -1,28 +1,15 @@
-// Copyright 2021 Optakt Labs OÜ
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License. You may obtain a copy of
-// the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-// License for the specific language governing permissions and limitations under
-// the License.
-
 package mocks
 
 import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"io"
 	"math/rand"
 	"time"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 
 	"github.com/rs/zerolog"
 
@@ -31,7 +18,7 @@ import (
 	"github.com/onflow/cadence/runtime/tests/utils"
 	"github.com/onflow/flow-go/crypto"
 	chash "github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -74,7 +61,6 @@ var (
 
 	GenericLedgerKey = ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(0, []byte(`owner`)),
-		ledger.NewKeyPart(1, []byte(`controller`)),
 		ledger.NewKeyPart(2, []byte(`key`)),
 	})
 
@@ -117,11 +103,15 @@ var (
 				Index:     0,
 				SeqNumber: 42,
 				HashAlgo:  chash.SHA2_256,
-				PublicKey: crypto.NeutralBLSPublicKey(),
+				PublicKey: crypto.IdentityBLSPublicKey(),
 			},
 		},
 	}
 )
+
+func newRandomFromIndex(index int) *rand.Rand {
+	return rand.New(rand.NewSource(int64(index)))
+}
 
 func GenericBlockIDs(number int) []flow.Identifier {
 	return genericIdentifiers(number, offsetBlock)
@@ -200,32 +190,64 @@ func GenericLedgerPath(index int) ledger.Path {
 	return GenericLedgerPaths(index + 1)[index]
 }
 
-func GenericLedgerValues(number int) []ledger.Value {
-	// Ensure consistent deterministic results.
-	random := rand.New(rand.NewSource(3))
-
-	var values []ledger.Value
+func GenericRegisterEntries(number int) flow.RegisterEntries {
+	registers := make(flow.RegisterEntries, 0, number)
 	for i := 0; i < number; i++ {
-		value := make(ledger.Value, 32)
-		binary.BigEndian.PutUint64(value[0:], random.Uint64())
-		binary.BigEndian.PutUint64(value[8:], random.Uint64())
-		binary.BigEndian.PutUint64(value[16:], random.Uint64())
-		binary.BigEndian.PutUint64(value[24:], random.Uint64())
+		registers = append(registers,
+			flow.RegisterEntry{
+				Key:   GenericRegister(i),
+				Value: GenericRegisterValue(i),
+			})
+	}
 
-		values = append(values, value)
+	return registers
+}
+
+func GenericRegisterEntry(index int) flow.RegisterEntry {
+	return GenericRegisterEntries(index + 1)[index]
+}
+
+func GenericRegisters(number int) flow.RegisterIDs {
+	registers := make(flow.RegisterIDs, 0, number)
+	for i := 0; i < number; i++ {
+		registers = append(registers, GenericRegister(i))
+	}
+
+	return registers
+}
+
+func GenericRegister(index int) flow.RegisterID {
+	random := newRandomFromIndex(index)
+
+	return flow.RegisterID{
+		Owner: GenericAddress(index).String(),
+		Key:   fmt.Sprintf("key-%d", +random.Uint64()),
+	}
+}
+
+func GenericRegisterValues(number int) []flow.RegisterValue {
+	values := make([]flow.RegisterValue, 0, number)
+	for i := 0; i < number; i++ {
+		values = append(values, GenericRegisterValue(i))
 	}
 
 	return values
 }
 
-func GenericLedgerValue(index int) ledger.Value {
-	return GenericLedgerValues(index + 1)[index]
+func GenericRegisterValue(index int) flow.RegisterValue {
+	random := newRandomFromIndex(index)
+	return []byte(fmt.Sprintf("value-%d", random.Uint64()))
 }
 
 func GenericLedgerPayloads(number int) []*ledger.Payload {
 	var payloads []*ledger.Payload
 	for i := 0; i < number; i++ {
-		payloads = append(payloads, ledger.NewPayload(GenericLedgerKey, GenericLedgerValue(i)))
+		reg := GenericRegister(i)
+		key := ledger.NewKey([]ledger.KeyPart{
+			ledger.NewKeyPart(0, []byte(reg.Owner)),
+			ledger.NewKeyPart(2, []byte(reg.Key)),
+		})
+		payloads = append(payloads, ledger.NewPayload(key, GenericRegisterValue(i)))
 	}
 
 	return payloads

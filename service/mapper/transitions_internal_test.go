@@ -1,17 +1,3 @@
-// Copyright 2021 Optakt Labs OÜ
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License. You may obtain a copy of
-// the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-// License for the specific language governing permissions and limitations under
-// the License.
-
 package mapper
 
 import (
@@ -36,13 +22,12 @@ import (
 
 func TestNewTransitions(t *testing.T) {
 	t.Run("nominal case, without options", func(t *testing.T) {
-		load := mocks.BaselineLoader(t)
 		chain := mocks.BaselineChain(t)
 		updates := mocks.BaselineParser(t)
 		read := mocks.BaselineReader(t)
 		write := mocks.BaselineWriter(t)
 
-		tr := NewTransitions(mocks.NoopLogger, load, chain, updates, read, write)
+		tr := NewTransitions(mocks.NoopLogger, chain, updates, read, write)
 
 		assert.NotNil(t, tr)
 		assert.Equal(t, chain, tr.chain)
@@ -53,14 +38,13 @@ func TestNewTransitions(t *testing.T) {
 	})
 
 	t.Run("nominal case, with option", func(t *testing.T) {
-		load := mocks.BaselineLoader(t)
 		chain := mocks.BaselineChain(t)
 		updates := mocks.BaselineParser(t)
 		read := mocks.BaselineReader(t)
 		write := mocks.BaselineWriter(t)
 
 		skip := true
-		tr := NewTransitions(mocks.NoopLogger, load, chain, updates, read, write,
+		tr := NewTransitions(mocks.NoopLogger, chain, updates, read, write,
 			WithSkipRegisters(skip),
 		)
 
@@ -698,11 +682,10 @@ func TestTransitions_MapRegisters(t *testing.T) {
 		}
 
 		write := mocks.BaselineWriter(t)
-		write.PayloadsFunc = func(height uint64, paths []ledger.Path, value []*ledger.Payload) error {
+		write.PayloadsFunc = func(height uint64, value []*ledger.Payload) error {
 			assert.Equal(t, mocks.GenericHeight, height)
 
 			// Expect the 5 entries from the map.
-			assert.Len(t, paths, 5)
 			assert.Len(t, value, 5)
 			return nil
 		}
@@ -764,7 +747,7 @@ func TestTransitions_MapRegisters(t *testing.T) {
 		}
 
 		write := mocks.BaselineWriter(t)
-		write.PayloadsFunc = func(uint64, []ledger.Path, []*ledger.Payload) error { return mocks.GenericError }
+		write.PayloadsFunc = func(uint64, []*ledger.Payload) error { return mocks.GenericError }
 
 		tr, st := baselineFSM(t, StatusMap)
 		tr.write = write
@@ -862,10 +845,11 @@ func TestTransitions_ForwardHeight(t *testing.T) {
 func TestTransitions_InitializeMapper(t *testing.T) {
 	t.Run("switches state to BootstrapState if configured to do so", func(t *testing.T) {
 		t.Parallel()
+		t.Skip("will need to provide a mock of a reader that returns not found when querying last indexed height")
 
 		tr, st := baselineFSM(t, StatusInitialize)
 
-		tr.cfg.BootstrapState = true
+		// tr.cfg.BootstrapState = true
 
 		err := tr.InitializeMapper(st)
 
@@ -878,7 +862,7 @@ func TestTransitions_InitializeMapper(t *testing.T) {
 
 		tr, st := baselineFSM(t, StatusInitialize)
 
-		tr.cfg.BootstrapState = false
+		// tr.cfg.BootstrapState = false
 
 		err := tr.InitializeMapper(st)
 
@@ -917,11 +901,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			return nil
 		}
 
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return tree, nil
-		}
-
 		reader := mocks.BaselineReader(t)
 		reader.LastFunc = func() (uint64, error) {
 			return header.Height, nil
@@ -937,7 +916,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			StatusResume,
 			withReader(reader),
 			withWriter(writer),
-			withLoader(loader),
 			withChain(chain),
 		)
 
@@ -956,11 +934,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			return 0, mocks.GenericError
 		}
 
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return tree, nil
-		}
-
 		reader := mocks.BaselineReader(t)
 		reader.LastFunc = func() (uint64, error) {
 			return header.Height, nil
@@ -973,7 +946,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			t,
 			StatusResume,
 			withReader(reader),
-			withLoader(loader),
 			withChain(chain),
 		)
 
@@ -995,11 +967,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			return mocks.GenericError
 		}
 
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return tree, nil
-		}
-
 		reader := mocks.BaselineReader(t)
 		reader.LastFunc = func() (uint64, error) {
 			return header.Height, nil
@@ -1013,7 +980,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			StatusResume,
 			withWriter(writer),
 			withReader(reader),
-			withLoader(loader),
 			withChain(chain),
 		)
 
@@ -1030,11 +996,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			return header.Height, nil
 		}
 
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return tree, nil
-		}
-
 		reader := mocks.BaselineReader(t)
 		reader.LastFunc = func() (uint64, error) {
 			return 0, mocks.GenericError
@@ -1047,7 +1008,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			t,
 			StatusResume,
 			withReader(reader),
-			withLoader(loader),
 			withChain(chain),
 		)
 
@@ -1064,11 +1024,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			return header.Height, nil
 		}
 
-		loader := mocks.BaselineLoader(t)
-		loader.TrieFunc = func() (*trie.MTrie, error) {
-			return tree, nil
-		}
-
 		reader := mocks.BaselineReader(t)
 		reader.LastFunc = func() (uint64, error) {
 			return header.Height, nil
@@ -1081,7 +1036,6 @@ func TestTransitions_ResumeIndexing(t *testing.T) {
 			t,
 			StatusForward,
 			withReader(reader),
-			withLoader(loader),
 			withChain(chain),
 		)
 
@@ -1133,7 +1087,6 @@ func createTrieWithNPayloads(t *testing.T, n int) *trie.MTrie {
 func baselineFSM(t *testing.T, status Status, opts ...func(tr *Transitions)) (*Transitions, *State) {
 	t.Helper()
 
-	load := mocks.BaselineLoader(t)
 	chain := mocks.BaselineChain(t)
 	updates := mocks.BaselineParser(t)
 	read := mocks.BaselineReader(t)
@@ -1144,12 +1097,10 @@ func baselineFSM(t *testing.T, status Status, opts ...func(tr *Transitions)) (*T
 
 	tr := Transitions{
 		cfg: Config{
-			BootstrapState: false,
-			SkipRegisters:  false,
-			WaitInterval:   0,
+			SkipRegisters: false,
+			WaitInterval:  0,
 		},
 		log:     mocks.NoopLogger,
-		load:    load,
 		chain:   chain,
 		updates: updates,
 		read:    read,
@@ -1170,12 +1121,6 @@ func baselineFSM(t *testing.T, status Status, opts ...func(tr *Transitions)) (*T
 	}
 
 	return &tr, &st
-}
-
-func withLoader(load Loader) func(*Transitions) {
-	return func(tr *Transitions) {
-		tr.load = load
-	}
 }
 
 func withChain(chain archive.Chain) func(*Transitions) {

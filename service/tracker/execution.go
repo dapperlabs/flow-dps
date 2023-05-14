@@ -1,17 +1,3 @@
-// Copyright 2021 Optakt Labs OÜ
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License. You may obtain a copy of
-// the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-// License for the specific language governing permissions and limitations under
-// the License.
-
 package tracker
 
 import (
@@ -21,7 +7,7 @@ import (
 	"github.com/gammazero/deque"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -176,9 +162,10 @@ func (e *Execution) processNext() error {
 
 	e.queue.PushFront(record.TrieUpdates)
 
-	e.log.Debug().
+	e.log.Info().
 		Hex("block", blockID[:]).
-		Int("updates", len(record.TrieUpdates)).
+		Uint64("height", record.Block.Header.Height).
+		Int("trie_updates", len(record.TrieUpdates)).
 		Msg("next execution record processed")
 
 	return nil
@@ -186,9 +173,12 @@ func (e *Execution) processNext() error {
 
 // purge deletes all records that are below the specified height threshold.
 func (e *Execution) purge(threshold uint64) {
+	purged := uint64(0)
 	for blockID, record := range e.records {
 		if record.Block.Header.Height < threshold {
 			delete(e.records, blockID)
+			purged++
 		}
 	}
+	e.log.Info().Uint64("threshold", threshold).Uint64("purged", purged).Msgf("finish purge")
 }

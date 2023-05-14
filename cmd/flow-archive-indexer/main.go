@@ -1,17 +1,3 @@
-// Copyright 2021 Optakt Labs OÜ
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License. You may obtain a copy of
-// the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-// License for the specific language governing permissions and limitations under
-// the License.
-
 package main
 
 import (
@@ -30,9 +16,9 @@ import (
 	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-archive/service/chain"
 	"github.com/onflow/flow-archive/service/index"
-	"github.com/onflow/flow-archive/service/loader"
 	"github.com/onflow/flow-archive/service/mapper"
 	"github.com/onflow/flow-archive/service/storage"
+	"github.com/onflow/flow-archive/service/storage2"
 	"github.com/onflow/flow-archive/service/triereader"
 )
 
@@ -59,6 +45,9 @@ func run() int {
 		flagLevel      string
 		flagTrie       string
 		flagSkip       bool
+
+		flagIndex2         string
+		flagBlockCacheSize int64
 	)
 
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to checkpoint root file, ensure the directory contains all partitions of checkpoint files for execution state trie")
@@ -67,6 +56,9 @@ func run() int {
 	pflag.StringVarP(&flagLevel, "level", "l", "info", "log output level")
 	pflag.StringVarP(&flagTrie, "trie", "t", "", "path to data directory for execution state ledger")
 	pflag.BoolVarP(&flagSkip, "skip", "s", false, "skip indexing of execution state ledger registers")
+
+	pflag.StringVarP(&flagIndex2, "index2", "I", "index2", "path to the pebble-based index database directory")
+	pflag.Int64Var(&flagBlockCacheSize, "block-cache-size", 1<<30, "size of the pebble block cache in bytes.")
 
 	pflag.Parse()
 
@@ -113,10 +105,20 @@ func run() int {
 	// transparently.
 	codec := zbor.NewCodec()
 	storage := storage.New(codec)
+	storage2, err := storage2.NewLibrary2(flagIndex2, flagBlockCacheSize)
+	if err != nil {
+		log.Error().Str("index2", flagIndex2).Err(err).Msg("could not open storage2")
+		return failure
+	}
+	defer func() {
+		err := storage2.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("could not close storage2")
+		}
+	}()
 
 	// Check if index already exists.
-	read := index.NewReader(log, indexDB, storage)
-	first, err := read.First()
+	read := index.NewReader(log, indexDB, storage, storage2)
 	empty := errors.Is(err, badger.ErrKeyNotFound)
 	if err != nil && !empty {
 		log.Error().Err(err).Msg("could not get first height from index reader")
@@ -141,7 +143,10 @@ func run() int {
 	// Writer is responsible for writing the index data to the index database.
 	// We explicitly disable flushing at regular intervals to improve throughput
 	// of badger transactions when indexing from static on-disk data.
-	write := index.NewWriter(indexDB, storage,
+	write := index.NewWriter(
+		indexDB,
+		storage,
+		storage2,
 		index.WithFlushInterval(0),
 	)
 	defer func() {
@@ -152,8 +157,6 @@ func run() int {
 	}()
 
 	// Initialize the transitions with the dependencies and add them to the FSM.
-	var load mapper.Loader
-	load = loader.FromIndex(log, storage, indexDB)
 	bootstrap := flagCheckpoint != ""
 	if empty {
 		file, err := os.Open(flagCheckpoint)
@@ -162,7 +165,6 @@ func run() int {
 			return failure
 		}
 		file.Close()
-		load = loader.FromCheckpointFile(flagCheckpoint, &log)
 	} else if bootstrap {
 		file, err := os.Open(flagCheckpoint)
 		if err != nil {
@@ -170,15 +172,9 @@ func run() int {
 			return failure
 		}
 		file.Close()
-		initialize := loader.FromCheckpointFile(flagCheckpoint, &log)
-		load = loader.FromIndex(log, storage, indexDB,
-			loader.WithInitializer(initialize),
-			loader.WithExclude(loader.ExcludeAtOrBelow(first)),
-		)
 	}
 
-	transitions := mapper.NewTransitions(log, load, disk, feed, read, write,
-		mapper.WithBootstrapState(bootstrap),
+	transitions := mapper.NewTransitions(log, disk, feed, read, write,
 		mapper.WithSkipRegisters(flagSkip),
 	)
 	state := mapper.EmptyState(flagCheckpoint)

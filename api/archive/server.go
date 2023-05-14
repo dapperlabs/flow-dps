@@ -1,24 +1,10 @@
-// Copyright 2021 Optakt Labs OÜ
-//
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License. You may obtain a copy of
-// the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-// License for the specific language governing permissions and limitations under
-// the License.
-
 package archive
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/onflow/flow-archive/util"
 
 	"github.com/onflow/flow-go/model/flow"
 
@@ -32,10 +18,9 @@ import (
 // This is generally an on-disk interface, but could be a GRPC-based index as
 // well, in which case there is a double redirection.
 type Server struct {
-	index    archive.Reader
-	codec    archive.Codec
-	cfg      Config
-	validate *validator.Validate
+	index archive.Reader
+	codec archive.Codec
+	cfg   Config
 	UnimplementedAPIServer
 }
 
@@ -48,10 +33,9 @@ func NewServer(index archive.Reader, codec archive.Codec, options ...Option) *Se
 	}
 
 	s := Server{
-		index:    index,
-		codec:    codec,
-		validate: validator.New(),
-		cfg:      cfg,
+		index: index,
+		codec: codec,
+		cfg:   cfg,
 	}
 
 	return &s
@@ -94,7 +78,7 @@ func (s *Server) GetLast(ctx context.Context, _ *GetLastRequest) (*GetLastRespon
 func (s *Server) GetHeightForBlock(ctx context.Context, req *GetHeightForBlockRequest) (*GetHeightForBlockResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetHeightForBlock)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -117,7 +101,7 @@ func (s *Server) GetHeightForBlock(ctx context.Context, req *GetHeightForBlockRe
 func (s *Server) GetCommit(ctx context.Context, req *GetCommitRequest) (*GetCommitResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetCommit)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -139,7 +123,7 @@ func (s *Server) GetCommit(ctx context.Context, req *GetCommitRequest) (*GetComm
 func (s *Server) GetHeader(ctx context.Context, req *GetHeaderRequest) (*GetHeaderResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetHeader)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -191,24 +175,25 @@ func (s *Server) GetEvents(ctx context.Context, req *GetEventsRequest) (*GetEven
 func (s *Server) GetRegisterValues(ctx context.Context, req *GetRegisterValuesRequest) (*GetRegisterValuesResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetRegisterValues)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
-
-	paths, err := convert.BytesToPaths(req.Paths)
+	err = util.ValidateHeightIndexed(s.index, req.Height)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert paths: %w", err)
+		return nil, fmt.Errorf("data unavailable for block height: %w", err)
+	}
+	registers, err := convert.BytesToRegisters(req.Registers)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert registers: %w", err)
 	}
 
-	values, err := s.index.Values(req.Height, paths)
+	values, err := s.index.Values(req.Height, registers)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve values: %w", err)
 	}
 
 	res := GetRegisterValuesResponse{
-		Height: req.Height,
-		Paths:  req.Paths,
 		Values: convert.ValuesToBytes(values),
 	}
 
@@ -220,7 +205,7 @@ func (s *Server) GetRegisterValues(ctx context.Context, req *GetRegisterValuesRe
 func (s *Server) GetCollection(ctx context.Context, req *GetCollectionRequest) (*GetCollectionResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetCollection)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -249,7 +234,7 @@ func (s *Server) GetCollection(ctx context.Context, req *GetCollectionRequest) (
 func (s *Server) ListCollectionsForHeight(ctx context.Context, req *ListCollectionsForHeightRequest) (*ListCollectionsForHeightResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.ListCollectionsForHeight)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -276,7 +261,7 @@ func (s *Server) ListCollectionsForHeight(ctx context.Context, req *ListCollecti
 func (s *Server) GetGuarantee(ctx context.Context, req *GetGuaranteeRequest) (*GetGuaranteeResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetGuarantee)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -305,7 +290,7 @@ func (s *Server) GetGuarantee(ctx context.Context, req *GetGuaranteeRequest) (*G
 func (s *Server) GetTransaction(ctx context.Context, req *GetTransactionRequest) (*GetTransactionResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetTransaction)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -334,7 +319,7 @@ func (s *Server) GetTransaction(ctx context.Context, req *GetTransactionRequest)
 func (s *Server) GetHeightForTransaction(ctx context.Context, req *GetHeightForTransactionRequest) (*GetHeightForTransactionResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetHeightForTransaction)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -358,7 +343,7 @@ func (s *Server) GetHeightForTransaction(ctx context.Context, req *GetHeightForT
 func (s *Server) ListTransactionsForHeight(ctx context.Context, req *ListTransactionsForHeightRequest) (*ListTransactionsForHeightResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.ListTransactionsForHeight)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -386,7 +371,8 @@ func (s *Server) ListTransactionsForHeight(ctx context.Context, req *ListTransac
 func (s *Server) GetResult(ctx context.Context, req *GetResultRequest) (*GetResultResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetResult)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -415,7 +401,7 @@ func (s *Server) GetResult(ctx context.Context, req *GetResultRequest) (*GetResu
 func (s *Server) GetSeal(ctx context.Context, req *GetSealRequest) (*GetSealResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.GetSeal)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -444,9 +430,14 @@ func (s *Server) GetSeal(ctx context.Context, req *GetSealRequest) (*GetSealResp
 func (s *Server) ListSealsForHeight(ctx context.Context, req *ListSealsForHeightRequest) (*ListSealsForHeightResponse, error) {
 	_, tracer := s.cfg.tracer.StartSpanFromContext(ctx, trace.ListSealsForHeight)
 	defer tracer.End()
-	err := s.validate.Struct(req)
+	err := req.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
+	}
+
+	err = util.ValidateHeightIndexed(s.index, req.Height)
+	if err != nil {
+		return nil, fmt.Errorf("data unavailable for block height: %w", err)
 	}
 
 	sealIDs, err := s.index.SealsByHeight(req.Height)
