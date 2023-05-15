@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,6 +28,11 @@ type VirtualMachine struct {
 		fvm.ProcedureOutput,
 		error,
 	)
+}
+
+func (v *VirtualMachine) NewExecutor(context fvm.Context, procedure fvm.Procedure, preparer storage.TransactionPreparer) fvm.ProcedureExecutor {
+	//TODO implement me
+	panic("implement me")
 }
 
 func BaselineVirtualMachine(t *testing.T) *VirtualMachine {
