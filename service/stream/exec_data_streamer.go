@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/flow-archive/models/archive"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -142,7 +142,7 @@ func (e ExecDataStreamer) pullExecData() error {
 
 func (e *ExecDataStreamer) getUploaderBlockData(blockID flow.Identifier) (*uploader.BlockData, error) {
 	// TODO : get rid of uploader.BlockData use
-	// we currently have to query additional data from ANs to keep a 1:1 match of the data from the GCP streamer
+	// we currently have to query additional data from ANs to keep a 1:1 match of the data from the GCP strea
 	var errs *multierror.Error
 	// get block
 	br := &access.GetBlockByIDRequest{Id: blockID[:]}
@@ -164,5 +164,13 @@ func (e *ExecDataStreamer) getUploaderBlockData(blockID flow.Identifier) (*uploa
 		errs = multierror.Append(errs, fmt.Errorf("failed to get execution data for blockID (%s): %w", blockID, err))
 	}
 	// TODO aggregate to *uploader.BlockData
-	return &uploader.BlockData{}, nil
+	return aggregateToBlockData()
+}
+
+func (e *ExecDataStreamer) aggregateToBlockData(
+	bl *access.BlockResponse,
+	tx access.TransactionResultResponse,
+	ex *execData.GetExecutionDataByBlockIDResponse,
+) (*uploader.BlockData, error) {
+
 }
