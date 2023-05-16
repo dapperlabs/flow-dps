@@ -30,11 +30,6 @@ type VirtualMachine struct {
 	)
 }
 
-func (v *VirtualMachine) NewExecutor(context fvm.Context, procedure fvm.Procedure, preparer storage.TransactionPreparer) fvm.ProcedureExecutor {
-	//TODO implement me
-	panic("implement me")
-}
-
 func BaselineVirtualMachine(t *testing.T) *VirtualMachine {
 	t.Helper()
 
@@ -86,4 +81,9 @@ func (v *VirtualMachine) Run(
 	error,
 ) {
 	return v.RunFunc(ctx, proc, view)
+}
+
+func (v *VirtualMachine) NewExecutor(context fvm.Context, procedure fvm.Procedure, preparer storage.TransactionPreparer) fvm.ProcedureExecutor {
+	// stub function
+	panic("implement me")
 }
