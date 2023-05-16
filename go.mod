@@ -28,7 +28,7 @@ require (
 require (
 	github.com/cockroachdb/pebble v0.0.0-20230428220915-dc0efbd4333b
 	github.com/envoyproxy/protoc-gen-validate v0.9.1
-	github.com/onflow/flow-go v0.30.1-0.20230515215420-0ef862386a12
+	github.com/onflow/flow-go v0.30.1-0.20230503175154-ebc4be2a52af
 	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230428213521-89bcc9e8517e
 	go.opentelemetry.io/otel v1.11.1
