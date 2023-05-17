@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
@@ -30,9 +29,10 @@ type ExecDataStreamer struct {
 	busy      uint32             // used as a guard to avoid concurrent polling
 	ctx       context.Context
 	chain     flow.ChainID
+	msgSize   int
 }
 
-func NewExecDataStreamer(log zerolog.Logger, accessAddr string, options ...Option) *ExecDataStreamer {
+func NewExecDataStreamer(log zerolog.Logger, accessAddr string, msgSize int, options ...Option) *ExecDataStreamer {
 	cfg := DefaultConfig
 	for _, option := range options {
 		option(&cfg)
@@ -41,7 +41,7 @@ func NewExecDataStreamer(log zerolog.Logger, accessAddr string, options ...Optio
 	ctx := context.Background()
 
 	// initialize clients
-	opts := []grpc.DialOption{grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+	opts := []grpc.DialOption{grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(msgSize)),
 		grpc.WithTransportCredentials(insecure.NewCredentials())}
 	conn, err := grpc.Dial(accessAddr, opts...)
 	if err != nil {
@@ -130,12 +130,11 @@ func (e ExecDataStreamer) pullExecData() error {
 			return fmt.Errorf("could not pull execution record (name: %s): %w", blockID, err)
 		}
 
-		e.log.Debug().
+		e.log.Info().
 			Str("name", blockID.String()).
 			Uint64("height", record.Block.Header.Height).
 			Hex("block", blockID[:]).
 			Msg("pushing execution record into buffer")
-
 		e.buffer.PushFront(record)
 	}
 }
@@ -163,14 +162,15 @@ func (e *ExecDataStreamer) getUploaderBlockData(blockID flow.Identifier) (*uploa
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to get execution data for blockID (%s): %w", blockID, err))
 	}
-	// TODO aggregate to *uploader.BlockData
-	return aggregateToBlockData()
+	return e.aggregateToBlockData(b, tx, ex)
 }
 
+// function to aggregate response data tp uploader.BlockData
+// TODO: remove this function when we use the streaming API
 func (e *ExecDataStreamer) aggregateToBlockData(
 	bl *access.BlockResponse,
-	tx access.TransactionResultResponse,
+	tx *access.TransactionResultsResponse,
 	ex *execData.GetExecutionDataByBlockIDResponse,
 ) (*uploader.BlockData, error) {
-
+	return nil, nil
 }

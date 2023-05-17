@@ -18,6 +18,7 @@ import (
 	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/api/option"
@@ -42,8 +43,8 @@ import (
 	"github.com/onflow/flow-archive/service/metrics"
 	"github.com/onflow/flow-archive/service/profiler"
 	"github.com/onflow/flow-archive/service/storage"
-	"github.com/onflow/flow-archive/service/stream"
 	"github.com/onflow/flow-archive/service/storage2"
+	"github.com/onflow/flow-archive/service/stream"
 	"github.com/onflow/flow-archive/service/tracker"
 )
 
@@ -86,7 +87,7 @@ func run() int {
 		flagSeedAddress   string
 		flagSeedKey       string
 		flagTracing       bool
-		flagDisableGCP    bool
+		flagMsgSize       int
 	)
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving DPS API")
 	pflag.StringVarP(&flagAccessAddress, "address-access", "A", "127.0.0.1:9000", "address to serve Access API on")
@@ -110,7 +111,7 @@ func run() int {
 	pflag.StringVar(&flagSeedAddress, "seed-address", "", "host address of seed node to follow consensus")
 	pflag.StringVar(&flagSeedKey, "seed-key", "", "hex-encoded public network key of seed node to follow consensus")
 	pflag.BoolVarP(&flagTracing, "tracing", "t", false, "enable tracing for this instance")
-	pflag.BoolVarP(&flagDisableGCP, "disable-cloud-streaming", "g", false, "disable streaming exec data from GCP and use the Access Node instead")
+	pflag.IntVar(&flagMsgSize, "grpc-msg-size", grpcutils.DefaultMaxMsgSize, "size limit of grpc messages")
 
 	pflag.Parse()
 
@@ -287,8 +288,8 @@ func run() int {
 
 	// On the other side, we also need access to the execution data from either GCP or Access Node API
 	var streamer tracker.DataStreamer
-	if flagDisableGCP || flagBucket == "" {
-		streamer = stream.NewExecDataStreamer(log, flagSeedAddress,
+	if flagBucket == "" {
+		streamer = stream.NewExecDataStreamer(log, flagSeedAddress, flagMsgSize,
 			stream.WithCatchupBlocks(blockIDs),
 		)
 	} else {
@@ -328,10 +329,6 @@ func run() int {
 			log.Error().Err(err).Msg("could not close GCP client")
 		}
 	}()
-	bucket := client.Bucket(flagBucket)
-	stream := cloud.NewGCPStreamer(log, bucket,
-		cloud.WithCatchupBlocks(blockIDs),
-	)
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
