@@ -4,12 +4,14 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 	"os"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog/log"
@@ -47,11 +49,12 @@ func NewAPIValidator(accessAddr string, archiveAddr string, ctx context.Context)
 		return nil, fmt.Errorf("unable to read cadence script to initilaize: %w", err)
 	}
 	scriptArgs := make([][]byte, 0)
-	accountID, err := hex.DecodeString("0x8c5303eaa26202d6")
+
+	address, err := common.HexToAddress("0x8c5303eaa26202d6")
 	if err != nil {
-		return nil, fmt.Errorf("unable to decode addr")
+		return nil, fmt.Errorf("invalid address")
 	}
-	scriptArgs = append(scriptArgs, accountID)
+	scriptArgs = append(scriptArgs, jsoncdc.MustEncode(cadence.NewAddress(address)))
 	return &APIValidator{
 		ctx:           ctx,
 		accountAddr:   accountAddr,
