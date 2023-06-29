@@ -5,10 +5,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
 	"os"
 	"time"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/hashicorp/go-multierror"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -89,11 +90,11 @@ func (a *APIValidator) CheckAPIResults(ctx context.Context) error {
 	log.Info().Msg("checkExecuteScriptAtBlockID successful")
 
 	// ExecuteScriptAtBlockHeight
-	//err := a.checkExecuteScriptAtBlockHeight(ctx)
-	//if err != nil {
-	//	return fmt.Errorf("unsuccessful ExecuteScriptAtBlockHeight comparison: %w", err)
-	//}
-	//log.Info().Msg("checkExecuteScriptAtBlockHeight successful")
+	err = a.checkExecuteScriptAtBlockHeight(ctx)
+	if err != nil {
+		return fmt.Errorf("unsuccessful ExecuteScriptAtBlockHeight comparison: %w", err)
+	}
+	log.Info().Msg("checkExecuteScriptAtBlockHeight successful")
 
 	// GetAccountAtBlockHeight
 	//err = a.checkGetAccountAtBlockHeight(ctx)
@@ -193,7 +194,7 @@ func main() {
 	// connect to Archive-Access instance
 	ctx := context.TODO()
 	accessAddr := "access-001.devnet46.nodes.onflow.org:9000"
-	archiveAddr := "access-002.devnet46.nodes.onflow.org:9000"
+	archiveAddr := "dps-001.devnet46.nodes.onflow.org:9000"
 	// archiveAddr := "dps-001.mainnet-staging1.nodes.onflow.org:9000" // badger based archive node
 	// archiveAddr := "dps-001.mainnet22.nodes.onflow.org:9000" // existing dps with the trie
 	// connect to Access instance
