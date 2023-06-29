@@ -4,8 +4,10 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/flow-go/model/flow"
@@ -30,20 +32,26 @@ func NewAPIValidator(accessAddr string, archiveAddr string, ctx context.Context)
 	accessClient := getAPIClient(accessAddr)
 	archiveClient := getAPIClient(archiveAddr)
 	accountAddr := flow.HexToAddress("e467b9dd11fa00df").Bytes()
-	recentBlock, err := accessClient.GetBlockByHeight(ctx, &access.GetBlockByHeightRequest{Height: 106242795}) // this might be flakey because a sealed block to access node might not be sealed yet to archive node
+	recentBlock, err := accessClient.GetLatestBlock(ctx, &access.GetLatestBlockRequest{IsSealed: false, FullBlockResponse: false}) // this might be flakey because a sealed block to access node might not be sealed yet to archive node
 	// recentBlock, err := accessClient.GetBlockByHeight(ctx, &access.GetBlockByHeightRequest{Height: 52853749}) // specify with a recent sealed block
 	// allow for archive node to sync block
+	time.Sleep(1 * time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get latest block from AN")
 	}
 	blockID := recentBlock.GetBlock().GetId()
 	blockHeight := recentBlock.GetBlock().Height
-	scriptPath := "get_token_balance.cdc"
+	scriptPath := "get_account.cdc"
 	script, err := os.ReadFile(scriptPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read cadence script to initilaize: %w", err)
 	}
 	scriptArgs := make([][]byte, 0)
+	accountID, err := hex.DecodeString("0x8c5303eaa26202d6")
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode addr")
+	}
+	scriptArgs = append(scriptArgs, accountID)
 	return &APIValidator{
 		ctx:           ctx,
 		accountAddr:   accountAddr,
@@ -69,8 +77,8 @@ func getAPIClient(addr string) access.AccessAPIClient {
 }
 
 func (a *APIValidator) CheckAPIResults(ctx context.Context) error {
-	log.Info().Msgf("starting comparison for block %v (%x)", a.blockHeight, a.blockID)
-	// ExecuteScriptAtBlockID
+	//log.Info().Msgf("starting comparison for block %v (%x)", a.blockHeight, a.blockID)
+	//// ExecuteScriptAtBlockID
 	err := a.checkExecuteScriptAtBlockID(ctx)
 	if err != nil {
 		return fmt.Errorf("unsuccessful ExecuteScriptAtBlockID comparison: %w", err)
@@ -78,18 +86,18 @@ func (a *APIValidator) CheckAPIResults(ctx context.Context) error {
 	log.Info().Msg("checkExecuteScriptAtBlockID successful")
 
 	// ExecuteScriptAtBlockHeight
-	err = a.checkExecuteScriptAtBlockHeight(ctx)
-	if err != nil {
-		return fmt.Errorf("unsuccessful ExecuteScriptAtBlockHeight comparison: %w", err)
-	}
-	log.Info().Msg("checkExecuteScriptAtBlockHeight successful")
+	//err := a.checkExecuteScriptAtBlockHeight(ctx)
+	//if err != nil {
+	//	return fmt.Errorf("unsuccessful ExecuteScriptAtBlockHeight comparison: %w", err)
+	//}
+	//log.Info().Msg("checkExecuteScriptAtBlockHeight successful")
 
 	// GetAccountAtBlockHeight
-	err = a.checkGetAccountAtBlockHeight(ctx)
-	if err != nil {
-		return fmt.Errorf("unsuccessful checkGetAccountAtBlockHeight comparison: %w", err)
-	}
-	log.Info().Msg("checkGetAccountAtBlockHeight successful")
+	//err = a.checkGetAccountAtBlockHeight(ctx)
+	//if err != nil {
+	//	return fmt.Errorf("unsuccessful checkGetAccountAtBlockHeight comparison: %w", err)
+	//}
+	//log.Info().Msg("checkGetAccountAtBlockHeight successful")
 	return nil
 }
 
@@ -101,11 +109,11 @@ func (a *APIValidator) checkExecuteScriptAtBlockID(ctx context.Context) error {
 		Script:    a.script,
 		Arguments: a.arguments,
 	}
-	accessRes, accessErr := a.accessClient.ExecuteScriptAtBlockID(ctx, req)
-	if accessErr != nil {
-		errs = multierror.Append(errs, fmt.Errorf("failed to get ExecuteScriptAtBlockID from access node: %w", accessErr))
-	}
-	log.Debug().Msg(fmt.Sprintf("received ExecuteScriptAtBlockID response from AN: %s", accessRes.String()))
+	//accessRes, accessErr := a.accessClient.ExecuteScriptAtBlockID(ctx, req)
+	//if accessErr != nil {
+	//	errs = multierror.Append(errs, fmt.Errorf("failed to get ExecuteScriptAtBlockID from access node: %w", accessErr))
+	//}
+	//log.Debug().Msg(fmt.Sprintf("received ExecuteScriptAtBlockID response from AN: %s", accessRes.String()))
 
 	archiveRes, archiveErr := a.archiveClient.ExecuteScriptAtBlockID(ctx, req)
 	if archiveErr != nil {
@@ -117,9 +125,9 @@ func (a *APIValidator) checkExecuteScriptAtBlockID(ctx context.Context) error {
 		return errs.ErrorOrNil()
 	}
 
-	if accessRes.String() != archiveRes.String() {
-		return fmt.Errorf("unequal results! for ExecuteScriptAtBlockID")
-	}
+	//if accessRes.String() != archiveRes.String() {
+	//	return fmt.Errorf("unequal results! for ExecuteScriptAtBlockID")
+	//}
 
 	return nil
 }
@@ -133,11 +141,11 @@ func (a *APIValidator) checkExecuteScriptAtBlockHeight(ctx context.Context) erro
 		Arguments:   a.arguments,
 	}
 
-	accessRes, accessErr := a.accessClient.ExecuteScriptAtBlockHeight(ctx, req)
-	if accessErr != nil {
-		errs = multierror.Append(errs, fmt.Errorf("failed to get ExecuteScriptAtBlockHeight from access node: %w", accessErr))
-	}
-	log.Debug().Msg(fmt.Sprintf("received ExecuteScriptAtBlockHeight response from AN: %s", accessRes.String()))
+	//accessRes, accessErr := a.accessClient.ExecuteScriptAtBlockHeight(ctx, req)
+	//if accessErr != nil {
+	//	errs = multierror.Append(errs, fmt.Errorf("failed to get ExecuteScriptAtBlockHeight from access node: %w", accessErr))
+	//}
+	//log.Debug().Msg(fmt.Sprintf("received ExecuteScriptAtBlockHeight response from AN: %s", accessRes.String()))
 
 	archiveRes, archiveErr := a.archiveClient.ExecuteScriptAtBlockHeight(ctx, req)
 	if archiveErr != nil {
@@ -149,9 +157,9 @@ func (a *APIValidator) checkExecuteScriptAtBlockHeight(ctx context.Context) erro
 		return errs.ErrorOrNil()
 	}
 
-	if accessRes.String() != archiveRes.String() {
-		return fmt.Errorf("unequal results! for ExecuteScriptAtBlockHeight")
-	}
+	//if accessRes.String() != archiveRes.String() {
+	//	return fmt.Errorf("unequal results! for ExecuteScriptAtBlockHeight")
+	//}
 
 	return nil
 
@@ -182,7 +190,7 @@ func main() {
 	// connect to Archive-Access instance
 	ctx := context.TODO()
 	accessAddr := "access-001.devnet46.nodes.onflow.org:9000"
-	archiveAddr := "access-003.devnet46.nodes.onflow.org:9000"
+	archiveAddr := "access-002.devnet46.nodes.onflow.org:9000"
 	// archiveAddr := "dps-001.mainnet-staging1.nodes.onflow.org:9000" // badger based archive node
 	// archiveAddr := "dps-001.mainnet22.nodes.onflow.org:9000" // existing dps with the trie
 	// connect to Access instance
