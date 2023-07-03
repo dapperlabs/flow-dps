@@ -29,7 +29,6 @@ type ExecDataStreamer struct {
 	busy      uint32             // used as a guard to avoid concurrent polling
 	ctx       context.Context
 	chain     flow.ChainID
-	msgSize   int
 }
 
 func NewExecDataStreamer(log zerolog.Logger, accessAddr string, msgSize int, options ...Option) *ExecDataStreamer {
@@ -53,7 +52,7 @@ func NewExecDataStreamer(log zerolog.Logger, accessAddr string, msgSize int, opt
 	// get chainID from network params
 	params, err := accessAPI.GetNetworkParameters(ctx, &access.GetNetworkParametersRequest{})
 	if err != nil {
-
+		log.Error().Err(err).Msg("unable to get network params")
 	}
 	chain := flow.ChainID(params.ChainId)
 
@@ -161,6 +160,10 @@ func (e *ExecDataStreamer) getUploaderBlockData(blockID flow.Identifier) (*uploa
 	ex, err := e.execApi.GetExecutionDataByBlockID(e.ctx, exr)
 	if err != nil {
 		errs = multierror.Append(errs, fmt.Errorf("failed to get execution data for blockID (%s): %w", blockID, err))
+	}
+	err = errs.ErrorOrNil()
+	if err != nil {
+		return nil, err
 	}
 	return e.aggregateToBlockData(b, tx, ex)
 }
