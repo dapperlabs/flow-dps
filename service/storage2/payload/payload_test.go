@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"os"
 	"path"
 	"strconv"
 	"testing"
@@ -198,3 +199,129 @@ func Benchmark_PayloadStorage(b *testing.B) {
 }
 
 // TODO(rbtz): add parallel benchmarks
+
+type update struct {
+	key string
+	val string
+}
+
+func TestSnapshot(t *testing.T) {
+	// A_14: A14
+	// A_13: A13
+	// A_11: A11
+	// A_10: A10
+	// B_14: B14
+	// B_13: B13
+	// B_11: B11
+	// B_10: B10
+	// C_14: C14
+	// C_12: <del>
+	// C_11: C11
+
+	RunWithTempDir(t, func(dir string) {
+		var err error
+
+		cache := pebble.NewCache(1 << 20)
+		defer cache.Unref()
+		dbpath := path.Join(dir, "snapshot.db")
+		s, err := NewStorage(dbpath, cache)
+		require.NoError(t, err)
+		require.NotNil(t, s)
+
+		// add keys at different height
+		err = addKeysAtHeight(s, 14, []update{
+			{key: "A", val: "A14"},
+			{key: "B", val: "B14"},
+			{key: "C", val: "C14"},
+		})
+		require.NoError(t, err)
+
+		err = addKeysAtHeight(s, 13, []update{
+			{key: "A", val: "A14"},
+			{key: "B", val: "B14"},
+		})
+		require.NoError(t, err)
+
+		err = addKeysAtHeight(s, 12, []update{
+			{key: "C", val: ""},
+		})
+		require.NoError(t, err)
+
+		err = addKeysAtHeight(s, 11, []update{
+			{key: "A", val: "A11"},
+			{key: "B", val: "B11"},
+			{key: "C", val: "C11"},
+		})
+		require.NoError(t, err)
+
+		err = addKeysAtHeight(s, 10, []update{
+			{key: "A", val: "A10"},
+			{key: "B", val: "B10"},
+		})
+		require.NoError(t, err)
+
+		key := flow.NewRegisterID("A", "somekey")
+		val, err := s.GetPayload(10, key)
+		require.NoError(t, err)
+		require.Equal(t, "A10", string(val))
+
+		assertKeysAtHeight(t, s, 10, map[string]string{
+			"A": "A10",
+			"B": "B10",
+		})
+
+		assertKeysAtHeight(t, s, 11, map[string]string{
+			"A": "A11",
+			"B": "B11",
+			"C": "C11",
+		})
+
+		assertKeysAtHeight(t, s, 12, map[string]string{
+			"A": "A11",
+			"B": "B11",
+		})
+	})
+}
+
+func addKeysAtHeight(s *Storage, height uint64, updates []update) error {
+	entries := make(flow.RegisterEntries, 0, len(updates))
+	for _, update := range updates {
+		entries = append(entries, flow.RegisterEntry{
+			Key:   flow.NewRegisterID(update.key, "somekey"),
+			Value: []byte(update.val),
+		})
+	}
+	return s.BatchSetPayload(height, entries)
+}
+
+func assertKeysAtHeight(t *testing.T, s *Storage, height uint64, expected map[string]string) {
+	all, err := s.AllPayloadsAtHeight(height)
+	require.NoError(t, err)
+
+	expectedUpdates := make(map[flow.RegisterID]flow.RegisterValue, len(all))
+	for k, v := range expected {
+		expectedUpdates[flow.NewRegisterID(k, "somekey")] = []byte(v)
+	}
+
+	require.Len(t, all, len(expected))
+	for regID, regVal := range all {
+		expectedVal, ok := expectedUpdates[regID]
+		require.True(t, ok, fmt.Sprintf("reg %v is missing", regID))
+
+		require.Equal(t, string(expectedVal), string(regVal))
+	}
+}
+
+func RunWithTempDir(t testing.TB, f func(string)) {
+	dbDir := TempDir(t)
+	defer func() {
+		require.NoError(t, os.RemoveAll(dbDir))
+	}()
+	f(dbDir)
+}
+
+func TempDir(t testing.TB) string {
+	dir, err := os.MkdirTemp("", "flow-testing-temp-")
+	require.NoError(t, err)
+	return dir
+}

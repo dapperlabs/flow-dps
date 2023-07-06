@@ -96,3 +96,54 @@ func (s *Storage) Checkpoint(dir string) error {
 func (s *Storage) Close() error {
 	return s.db.Close()
 }
+
+func (s *Storage) AllPayloadsAtHeight(height uint64) (map[flow.RegisterID]flow.RegisterValue, error) {
+	// TODO: check height is above the upperbound
+	iter := s.db.NewIter(&pebble.IterOptions{
+		UseL6Filters: true,
+	})
+	defer iter.Close()
+
+	var lastRegID flow.RegisterID
+	payloads := make(map[flow.RegisterID]flow.RegisterValue)
+	ok := iter.SeekGE([]byte{})
+	if !ok {
+		return nil, fmt.Errorf("no data")
+	}
+	for {
+		ok := iter.Next()
+		if !ok {
+			break
+		}
+
+		lookupKey := iter.Key()
+		regHeight, regID, err := lookupKeyToRegisterID(lookupKey)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert lookup key (%x) to register: %w", lookupKey, err)
+		}
+
+		if regHeight > height {
+			continue
+		}
+
+		if regID == lastRegID {
+			continue
+		}
+
+		binaryValue, err := iter.ValueAndErr()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get value: %w", err)
+		}
+
+		if len(binaryValue) != 0 {
+			// preventing caller from modifying the iterator's value slices
+			valueCopy := make([]byte, len(binaryValue))
+			copy(valueCopy, binaryValue)
+			payloads[regID] = flow.RegisterValue(valueCopy)
+		}
+
+		lastRegID = regID
+	}
+
+	return payloads, nil
+}
