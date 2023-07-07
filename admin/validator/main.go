@@ -35,8 +35,8 @@ func NewAPIValidator(accessAddr string, archiveAddr string, ctx context.Context)
 	accessClient := getAPIClient(accessAddr)
 	archiveClient := getAPIClient(archiveAddr)
 	accountAddr := flow.HexToAddress("e467b9dd11fa00df").Bytes()
-	recentBlock, err := accessClient.GetLatestBlock(ctx, &access.GetLatestBlockRequest{IsSealed: false, FullBlockResponse: false}) // this might be flakey because a sealed block to access node might not be sealed yet to archive node
-	// recentBlock, err := accessClient.GetBlockByHeight(ctx, &access.GetBlockByHeightRequest{Height: 52853749}) // specify with a recent sealed block
+	// recentBlock, err := accessClient.GetLatestBlock(ctx, &access.GetLatestBlockRequest{IsSealed: false, FullBlockResponse: false}) // this might be flakey because a sealed block to access node might not be sealed yet to archive node
+	recentBlock, err := accessClient.GetBlockByHeight(ctx, &access.GetBlockByHeightRequest{Height: 109467952}) // specify with a recent sealed block
 	// allow for archive node to sync block
 	time.Sleep(1 * time.Second)
 	if err != nil {
