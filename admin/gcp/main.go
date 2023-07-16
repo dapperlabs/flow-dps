@@ -11,21 +11,36 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	execData "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-func CompareTrieUpdates(a []*ledger.TrieUpdate, b []*ledger.TrieUpdate) error {
-
+func CompareTrieUpdates(e []*ledger.TrieUpdate, g []*ledger.TrieUpdate) error {
+	// compare lengths
+	if len(e) != len(g) {
+		return fmt.Errorf("unequal lengths")
+	}
+	// compare updates
+	for idx, update := range e {
+		if !update.Equals(g[idx]) {
+			return fmt.Errorf("mismatching trie update at index %d", idx)
+		}
+	}
+	return nil
 }
 
 func CompareCborRegistersWithExecutionResult(
 	ctx context.Context,
 	a access.AccessAPIClient,
-	e access.,
-	b *gcloud.BucketHandle,
+	e execData.ExecutionDataAPIClient,
+	b gcloud.BucketHandle,
 	height uint64,
 	decoder cbor.DecMode,
+	chain flow.Chain,
 ) error {
 	// get block and determine file name
 	req := access.GetBlockByHeightRequest{Height: height, FullBlockResponse: true}
@@ -38,7 +53,7 @@ func CompareCborRegistersWithExecutionResult(
 		panic(fmt.Errorf("could not convert message to block: %w", err))
 	}
 	fileName := block.ID().String() + ".cbor"
-
+	print(fileName)
 	// get cbor file and unmarhsall to block data
 	object := b.Object(fileName)
 	reader, err := object.NewReader(context.Background())
@@ -59,21 +74,24 @@ func CompareCborRegistersWithExecutionResult(
 	}
 
 	// get execution result for the block to compare trieUpdates
-	req2 := access.GetExecutionResultForBlockIDRequest{BlockId: convert.IdentifierToMessage(block.ID())}
-	res2, err := a.GetExecutionResultForBlockID(ctx, &req2)
+	req2 := execData.GetExecutionDataByBlockIDRequest{BlockId: convert.IdentifierToMessage(block.ID())}
+	res2, err := e.GetExecutionDataByBlockID(ctx, &req2)
 	if err != nil {
-		panic(fmt.Errorf("could not get execution result for height %d: %w", height, err))
+		panic(fmt.Errorf("could not get execution data for height %d: %w", height, err))
 	}
-	executionResult, err := convert.MessageToExecutionResult(res2.ExecutionResult)
-	if err != nil {
-
+	extractedData, err := convert.MessageToBlockExecutionData(res2.BlockExecutionData, chain)
+	// extract trie Updates
+	trieUpdates := make([]*ledger.TrieUpdate, 0, 0)
+	for _, chunk := range extractedData.ChunkExecutionDatas {
+		trieUpdates = append(trieUpdates, chunk.TrieUpdate)
 	}
-
-	err = CompareTrieUpdates()
+	// compare
+	return CompareTrieUpdates(trieUpdates, record.TrieUpdates)
 }
 
 func main() {
-	gbucketName := ""
+	accessAddr := "access-002.devnet46.nodes.onflow.org:9000"
+	gbucketName := "flow_public_devnet46_execution_state"
 	gClient, err := gcloud.NewClient(context.Background(),
 		option.WithoutAuthentication(),
 	)
@@ -93,5 +111,25 @@ func main() {
 
 		}
 	}()
-	CompareCborRegistersWithExecutionResult(context.Background())
+	// initialize clients
+	opts := []grpc.DialOption{grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(40 * 1024 * 1024)),
+		grpc.WithTransportCredentials(insecure.NewCredentials())}
+	conn1, err := grpc.Dial(accessAddr, opts...)
+	if err != nil {
+		panic(err)
+	}
+	conn2, err := grpc.Dial(accessAddr, opts...)
+	if err != nil {
+		panic(err)
+	}
+	execDataAPI := execData.NewExecutionDataAPIClient(conn1)
+	accessAPI := access.NewAccessAPIClient(conn2)
+	// set chain
+	chain := flow.Testnet.Chain()
+	var start uint64 = 110950403
+	var end uint64 = 110950404
+	for height := start; height < end; height++ {
+		CompareCborRegistersWithExecutionResult(context.Background(), accessAPI, execDataAPI, *bucket, height, decoder,
+			chain)
+	}
 }
