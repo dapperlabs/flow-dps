@@ -18,6 +18,7 @@ import (
 	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/api/option"
@@ -44,6 +45,7 @@ import (
 	"github.com/onflow/flow-archive/service/profiler"
 	"github.com/onflow/flow-archive/service/storage"
 	"github.com/onflow/flow-archive/service/storage2"
+	"github.com/onflow/flow-archive/service/stream"
 	"github.com/onflow/flow-archive/service/tracker"
 )
 
@@ -86,11 +88,12 @@ func run() int {
 		flagSeedAddress   string
 		flagSeedKey       string
 		flagTracing       bool
+		flagMsgSize       int
 	)
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving DPS API")
 	pflag.StringVarP(&flagAccessAddress, "address-access", "A", "127.0.0.1:9000", "address to serve Access API on")
 	pflag.StringVarP(&flagBootstrap, "bootstrap", "b", "bootstrap", "path to directory with bootstrap information for spork")
-	pflag.StringVarP(&flagBucket, "bucket", "u", "", "Google Cloude Storage bucket with block data records")
+	pflag.StringVarP(&flagBucket, "bucket", "u", "", "Google Cloud Storage bucket with block data records")
 	pflag.StringVarP(&flagCheckpoint, "checkpoint", "c", "", "path to root checkpoint file for execution state trie")
 	pflag.StringVarP(&flagData, "data", "d", "data", "path to database directory for protocol data")
 	pflag.StringVarP(&flagLevel, "level", "l", "info", "log output level")
@@ -109,6 +112,7 @@ func run() int {
 	pflag.StringVar(&flagSeedAddress, "seed-address", "", "host address of seed node to follow consensus")
 	pflag.StringVar(&flagSeedKey, "seed-key", "", "hex-encoded public network key of seed node to follow consensus")
 	pflag.BoolVarP(&flagTracing, "tracing", "t", false, "enable tracing for this instance")
+	pflag.IntVar(&flagMsgSize, "grpc-msg-size", grpcutils.DefaultMaxMsgSize, "size limit of grpc messages")
 
 	pflag.Parse()
 
@@ -283,6 +287,31 @@ func run() int {
 		return failure
 	}
 
+	// On the other side, we also need access to the execution data from either GCP or Access Node API
+	var streamer tracker.DataStreamer
+	if flagBucket == "" {
+		streamer = stream.NewExecDataStreamer(log, flagSeedAddress, flagMsgSize,
+			stream.WithCatchupBlocks(blockIDs),
+		)
+	} else {
+		client, err := gcloud.NewClient(context.Background(),
+			option.WithoutAuthentication(),
+		)
+		if err != nil {
+			log.Error().Err(err).Msg("could not connect GCP client")
+			return failure
+		}
+		defer func() {
+			err := client.Close()
+			if err != nil {
+				log.Error().Err(err).Msg("could not close GCP client")
+			}
+		}()
+		bucket := client.Bucket(flagBucket)
+		streamer = cloud.NewGCPStreamer(log, bucket,
+			cloud.WithCatchupBlocks(blockIDs),
+		)
+	}
 	log.Info().Msgf("%v blocks to catchup", len(blockIDs))
 	// On the other side, we also need access to the execution data. The cloud
 	// streamer is responsible for retrieving block execution records from a
@@ -301,16 +330,12 @@ func run() int {
 			log.Error().Err(err).Msg("could not close GCP client")
 		}
 	}()
-	bucket := client.Bucket(flagBucket)
-	stream := cloud.NewGCPStreamer(log, bucket,
-		cloud.WithCatchupBlocks(blockIDs),
-	)
 
 	// Next, we can initialize our consensus and execution trackers. They are
 	// responsible for tracking changes to the available data, for the consensus
 	// follower and related consensus data on one side, and the cloud streamer
 	// and available execution records on the other side.
-	execution, err := tracker.NewExecution(log, protocolDB, stream)
+	execution, err := tracker.NewExecution(log, protocolDB, streamer)
 	if err != nil {
 		log.Error().Err(err).Msg("could not initialize execution tracker")
 		return failure
@@ -326,7 +351,7 @@ func run() int {
 	// will use the callback to make additional data available to the mapper,
 	// while the cloud streamer will use the callback to download execution data
 	// for finalized blocks.
-	follow.AddOnBlockFinalizedConsumer(stream.OnBlockFinalized)
+	follow.AddOnBlockFinalizedConsumer(streamer.OnBlockFinalized)
 	follow.AddOnBlockFinalizedConsumer(consensus.OnBlockFinalized)
 
 	// If metrics are enabled, the mapper should use the metrics writer. Otherwise, it can
