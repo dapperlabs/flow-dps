@@ -427,9 +427,13 @@ func (s *Server) ExecuteScriptAtLatestBlock(ctx context.Context, in *access.Exec
 // See https://docs.onflow.org/access-api/#executescriptatblockid
 func (s *Server) ExecuteScriptAtBlockID(ctx context.Context, in *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
 	blockID := flow.HashToID(in.BlockId)
+	last, err := s.index.Last()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get last indexed height", err)
+	}
 	height, err := s.index.HeightForBlock(blockID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "could not get height for block ID %x: %v", blockID, err)
+		return nil, status.Errorf(codes.NotFound, "could not get height for block ID %x, last indexed height %d : %v", blockID, last, err)
 	}
 
 	req := &access.ExecuteScriptAtBlockHeightRequest{
