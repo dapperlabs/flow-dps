@@ -498,7 +498,8 @@ func (t *Transitions) IndexChain(s *State) error {
 		return fmt.Errorf("could not index events: %w", err)
 	}
 
-	t.log.Debug().
+	t.log.
+		Info().
 		Uint64("height", s.height).
 		Str("block_id", blockID.String()).
 		Int("n_guarantees", len(guarantees)).
