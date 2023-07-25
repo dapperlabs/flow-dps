@@ -379,7 +379,7 @@ func (t *Transitions) MapRegisters(s *State) error {
 		}
 	}
 
-	log.Debug().
+	log.Info().
 		Int("registers", registers).
 		Msg("indexed all registers for finalized block")
 
