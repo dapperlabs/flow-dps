@@ -86,10 +86,11 @@ func run() int {
 		flagIndex2         string
 		flagBlockCacheSize int64
 
-		flagFlushInterval time.Duration
-		flagSeedAddress   string
-		flagSeedKey       string
-		flagTracing       bool
+		flagFlushInterval     time.Duration
+		flagSeedAddress       string
+		flagSeedKey           string
+		flagTracing           bool
+		flagValidateRegisters bool
 	)
 	pflag.StringVarP(&flagAddress, "address", "a", "127.0.0.1:5005", "bind address for serving DPS API")
 	pflag.StringVarP(&flagAccessAddress, "address-access", "A", "127.0.0.1:9000", "address to serve Access API on")
@@ -114,6 +115,7 @@ func run() int {
 	pflag.StringVar(&flagSeedKey, "seed-key", "", "hex-encoded public network key of seed node to follow consensus")
 	pflag.BoolVarP(&flagTracing, "tracing", "t", false, "enable tracing for this instance")
 	pflag.StringVar(&flagExecAddress, "exec-address", "", "host address of access node to get exec data from")
+	pflag.BoolVarP(&flagValidateRegisters, "validate-registers", "v", false, "validate register data from GCP with exec")
 
 	pflag.Parse()
 
@@ -320,7 +322,9 @@ func run() int {
 		log.Error().Err(err).Msg("could not get connect to exec data sync access node")
 		return failure
 	}
-	execApi = access2.NewExecutionDataAPIClient(conn)
+	if flagValidateRegisters {
+		execApi = access2.NewExecutionDataAPIClient(conn)
+	}
 	accessApi := access.NewAccessAPIClient(conn)
 
 	req := &access.GetNetworkParametersRequest{}
@@ -410,11 +414,6 @@ func run() int {
 		server = api.NewServer(read, codec, api.WithTracer(tracer))
 	} else {
 		server = api.NewServer(read, codec)
-	}
-
-	if err != nil {
-		log.Error().Err(err).Msg("could not get chainID")
-		return failure
 	}
 
 	log.Info().Msgf("Creating local invoker with register cache: %d", flagCache)
