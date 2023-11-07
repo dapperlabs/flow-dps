@@ -3,19 +3,19 @@ managed:
   enabled: true
   go_package_prefix:
     # todo: re-organize this, keeping it to the old reference so consumers don't break
-    default: github.com/onflow/archive/api/archive
+    default: github.com/onflow/archive/api/archive/client
     except:
       - buf.build/googleapis/googleapis
       - buf.build/envoyproxy/protoc-gen-validate
 
 plugins:
   - plugin: buf.build/bufbuild/validate-go:v1.0.0
-    out: ../archive
+    out: ../archive/client
     opt:
       - paths=source_relative
 
   - plugin: buf.build/protocolbuffers/go:v1.28.1
-    out: ../archive
+    out: ../archive/client
     opt:
       - paths=source_relative
 

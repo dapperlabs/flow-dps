@@ -2,7 +2,7 @@
 // protoc-gen-go-vtproto version: v0.5.0
 // source: api.proto
 
-package archive
+package client
 
 import (
 	context "context"
