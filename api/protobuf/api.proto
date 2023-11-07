@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "validate/validate.proto";
 
-option go_package = "github.com/onflow/flow-archive/api/archive";
+option go_package = "github.com/onflow/flow-archive/api/archive/client";
 
 service API {
   rpc GetFirst(GetFirstRequest) returns (GetFirstResponse) {}
