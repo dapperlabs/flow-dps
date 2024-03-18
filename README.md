@@ -1,6 +1,6 @@
 # Deprecated
 
-The flow data provisioning service is deprecated. The functionality is now available as part for the Flow Access node.
+The Flow Data Provisioning Service is deprecated. This functionality is now available as part of the Flow Access node.
 
 # Flow Data Provisioning Service
 
