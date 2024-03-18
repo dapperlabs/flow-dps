@@ -1,3 +1,7 @@
+# Deprecated
+
+The flow data provisioning service is deprecated. The functionality is now available as part for the Flow Access node.
+
 # Flow Data Provisioning Service
 
 [![CI Status](https://img.shields.io/github/workflow/status/optakt/flow-dps/MasterCI?logo=GitHub%20Actions&label=&logoColor=silver&labelColor=gray)](https://github.com/optakt/flow-dps/actions/workflows/master.yml)
